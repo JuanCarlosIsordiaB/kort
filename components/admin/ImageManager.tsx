@@ -102,7 +102,7 @@ export function ImageManager({
           <img
             src={image.url}
             alt=""
-            className={`h-20 w-28 shrink-0 rounded-[var(--radius-thumb)] object-cover ${
+            className={`h-16 w-20 shrink-0 rounded-[var(--radius-thumb)] object-cover sm:h-20 sm:w-28 ${
               image.visible ? "" : "opacity-35 grayscale"
             }`}
           />
@@ -130,7 +130,8 @@ export function ImageManager({
                   onClick={() => move(index, -1)}
                   disabled={index === 0}
                   title="Subir"
-                  className="rounded border border-border px-2 py-1 text-xs disabled:opacity-30"
+                  aria-label="Subir"
+                  className="h-8 w-8 rounded border border-border text-xs disabled:opacity-30"
                 >
                   ↑
                 </button>
@@ -139,14 +140,15 @@ export function ImageManager({
                   onClick={() => move(index, 1)}
                   disabled={index === images.length - 1}
                   title="Bajar"
-                  className="rounded border border-border px-2 py-1 text-xs disabled:opacity-30"
+                  aria-label="Bajar"
+                  className="h-8 w-8 rounded border border-border text-xs disabled:opacity-30"
                 >
                   ↓
                 </button>
                 <button
                   type="button"
                   onClick={() => onChange(images.filter((_, i) => i !== index))}
-                  className="rounded border border-border px-2 py-1 text-xs text-orange"
+                  className="h-8 rounded border border-border px-2 text-xs text-orange"
                 >
                   Quitar
                 </button>

@@ -25,7 +25,6 @@ export const contentType = "image/jpeg";
 
 const NAVY = "#0A1931";
 const IVORY = "#FFF6E8";
-const BLUE = "#1741D6";
 
 const PHOTO_WIDTH = 504; // 42% de 1200
 
@@ -156,8 +155,8 @@ function Card({
               style={{
                 display: "flex",
                 alignSelf: "flex-start",
-                background: BLUE,
-                color: "#FFFFFF",
+                background: IVORY,
+                color: NAVY,
                 fontSize: 20,
                 fontWeight: 800,
                 letterSpacing: 2,

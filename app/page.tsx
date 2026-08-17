@@ -37,7 +37,9 @@ export default async function HomePage() {
 
         {lead ? (
           <>
-            <div className="grid lg:grid-cols-[1.7fr_1fr]">
+            {/* Lo de arriba del pliegue entra al cargar; las tarjetas de abajo
+                se revelan solas al entrar en pantalla (`kort-reveal`). */}
+            <div className="kort-stagger grid lg:grid-cols-[1.7fr_1fr]">
               <LeadPackage news={lead} headlineHtml={settings.hero_headline_html} />
               <SidebarTabs breaking={breaking} featured={featured} />
             </div>

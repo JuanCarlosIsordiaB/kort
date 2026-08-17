@@ -68,7 +68,7 @@ export function LoginForm() {
         />
       </label>
 
-      {error && <p className="text-sm font-semibold text-accent">{error}</p>}
+      {error && <p className="text-sm font-semibold text-orange">{error}</p>}
 
       <button
         type="submit"

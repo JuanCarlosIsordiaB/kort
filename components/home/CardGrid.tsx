@@ -48,15 +48,18 @@ export function CardGrid({ items }: { items: NewsWithCategory[] }) {
         <Link
           key={news.id}
           href={`/noticias/${news.slug}`}
-          className="group flex flex-col overflow-hidden rounded-[var(--radius-card)] bg-card shadow-[var(--shadow-card)] transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[var(--shadow-card-hover)]"
+          className="kort-reveal group flex flex-col overflow-hidden rounded-[var(--radius-card)] bg-card shadow-[var(--shadow-card)] transition-all duration-200 ease-soft hover:-translate-y-[3px] hover:shadow-[var(--shadow-card-hover)]"
         >
           {news.cover_image_url ? (
+            /* El acercamiento va sobre la foto y el recorte sobre la tarjeta
+               (`overflow-hidden` de arriba): así la imagen crece dentro del
+               marco en vez de empujarlo. */
             <Image
               src={news.cover_image_url}
               alt=""
               width={640}
               height={360}
-              className="h-[150px] w-full object-cover"
+              className="h-[150px] w-full object-cover transition-transform duration-500 ease-soft group-hover:scale-[1.04]"
             />
           ) : (
             <div className="h-[150px] w-full bg-chip" />

@@ -91,6 +91,28 @@ Dos comportamientos que vale conocer:
 
 > `/` es la única ruta con ISR (`revalidate = 300`), porque no lee params ni cookies y Next la prerenderizaría congelada. Por eso todo lo que la afecta —portada, noticias, secciones— llama a `revalidatePath("/")`. Si agregas otra ruta estática que muestre notas, acuérdate de lo mismo.
 
+### La nota
+
+**Galería.** Una nota tiene varias imágenes (`news_images`); el admin marca cuáles se ven y en qué orden desde el mismo formulario. Con dos o más visibles, la nota las rota cada 5 s — pausando al pasar el cursor y sin auto-avanzar si el sistema pide `prefers-reduced-motion`. Con una sola no monta nada de slider.
+
+`news.cover_image_url` ya **no se escribe a mano**: es siempre la primera imagen visible, recalculada al guardar. Así las tarjetas, la portada y el Open Graph siguen leyendo una sola columna y el admin administra una sola cosa.
+
+**Compartir.** WhatsApp, X, Facebook, copiar link y el diálogo nativo donde exista. La URL llega absoluta desde `lib/site.ts` (nunca `localhost`).
+
+La vista previa la genera `app/noticias/[slug]/opengraph-image.tsx` en vez de mandar la foto original, y eso resuelve tres cosas de golpe: el convenio de archivo hace que Next inyecte `og:image` con URL absoluta y dimensiones —lo que suele faltar—; el título y el extracto van dentro de la imagen; y el peso baja de ~850 kb a ~100 kb, por debajo de lo que WhatsApp necesita para generar miniatura.
+
+Dos detalles no obvios ahí: **satori solo decodifica PNG y JPEG**, y ocho de nuestras portadas son WebP o AVIF, así que se convierten con `sharp` antes de dibujarlas (sin eso la tarjeta salía sin foto). Y satori no lee woff2, que es lo que usa `next/font`, por eso hay TTF de Manrope vendorizados en `assets/fonts/`.
+
+> En desarrollo `og:image` sale apuntando a `localhost` aunque `metadataBase` diga otra cosa: Next lo fuerza a propósito (ver `getSocialImageMetadataBaseFallback` en `next/dist/lib/metadata/resolvers/resolve-url.js`). En producción usa `metadataBase`. La vista previa real solo se puede comprobar tras desplegar.
+
+**Ayudas de lectura.** Barra vertical de avance pegada al borde derecho y botón de volver arriba tras 800px. La barra mide el `<main>` de la nota, no la página completa: contando el masthead y el pie, arrancaría avanzada y llegaría al 100% antes del último párrafo.
+
+### Perfil del autor
+
+`admins.avatar_url` guarda la foto; `news.author_avatar_url` la copia en cada nota. Hace falta desnormalizar porque `admins` no es legible por anon.
+
+La asimetría es deliberada: **el nombre no se propaga y la foto sí**. Una byline firmada es un registro histórico y no debe cambiar porque el autor se renombre; una foto de perfil, en cambio, es la persona de hoy, así que `PUT /api/perfil` la reescribe en todo lo que ese autor haya firmado.
+
 ### Tema claro/oscuro
 
 Tres estados: sin elección guardada se sigue la preferencia del sistema; una vez que el usuario toca el botón, su elección manda y se guarda en `localStorage`.

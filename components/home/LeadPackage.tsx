@@ -58,7 +58,7 @@ export function LeadPackage({
 
       <Link
         href={`/noticias/${news.slug}`}
-        className="mb-6 inline-block rounded-[var(--radius-pill)] border border-foreground bg-foreground px-6 py-3 text-[11px] font-extrabold tracking-[1.2px] text-background transition-colors hover:border-blue hover:bg-blue hover:text-white"
+        className="mb-6 inline-block rounded-[var(--radius-pill)] border border-foreground bg-foreground px-6 py-3 text-[11px] font-extrabold tracking-[1.2px] text-background transition-colors hover:bg-background hover:text-foreground"
       >
         LEER LA NOTA →
       </Link>

@@ -21,7 +21,7 @@ export default async function EditarNoticiaPage(
 
   return (
     <div className="max-w-3xl">
-      <h1 className="mb-6 text-3xl font-extrabold">Editar noticia</h1>
+      <h1 className="mb-6 text-2xl font-extrabold sm:text-3xl">Editar noticia</h1>
       <NewsForm categories={categories} news={news} images={images} />
     </div>
   );

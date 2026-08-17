@@ -121,12 +121,14 @@ export function PortadaEditor({
             <div className="flex flex-col gap-2">
               {rows.map((id, index) => (
                 <div key={`${slot}-${index}`} className="flex items-center gap-2">
-                  <span className="w-5 text-xs font-bold text-muted">{index + 1}</span>
+                  <span className="w-4 shrink-0 text-xs font-bold text-muted">{index + 1}</span>
 
+                  {/* `min-w-0`: si no, el título más largo de la lista fija el
+                      ancho mínimo del select y desborda la pantalla en móvil. */}
                   <select
                     value={id}
                     onChange={(e) => setPick(slot, index, e.target.value)}
-                    className="flex-1 rounded-[var(--radius-thumb)] border border-border bg-input px-3 py-2 text-sm"
+                    className="w-full min-w-0 flex-1 rounded-[var(--radius-thumb)] border border-border bg-input px-3 py-2 text-sm"
                   >
                     <option value="">
                       {index < picked.length ? "— quitar —" : "— automático (lo más reciente) —"}
@@ -146,7 +148,8 @@ export function PortadaEditor({
                         onClick={() => move(slot, index, -1)}
                         disabled={index === 0}
                         title="Subir"
-                        className="rounded border border-border px-2 py-1 text-xs disabled:opacity-30"
+                        aria-label="Subir"
+                        className="h-9 w-9 shrink-0 rounded border border-border text-xs disabled:opacity-30"
                       >
                         ↑
                       </button>
@@ -155,7 +158,8 @@ export function PortadaEditor({
                         onClick={() => move(slot, index, 1)}
                         disabled={index === picked.length - 1}
                         title="Bajar"
-                        className="rounded border border-border px-2 py-1 text-xs disabled:opacity-30"
+                        aria-label="Bajar"
+                        className="h-9 w-9 shrink-0 rounded border border-border text-xs disabled:opacity-30"
                       >
                         ↓
                       </button>
@@ -216,12 +220,12 @@ export function PortadaEditor({
         </p>
       )}
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={save}
           disabled={pending}
-          className="rounded-[var(--radius-pill)] bg-accent px-5 py-2 text-sm font-bold text-accent-foreground disabled:opacity-60"
+          className="rounded-[var(--radius-pill)] bg-accent px-5 py-3 text-sm font-bold text-accent-foreground disabled:opacity-60 max-sm:w-full sm:py-2"
         >
           {pending ? "Guardando…" : "Guardar portada"}
         </button>

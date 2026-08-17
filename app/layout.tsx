@@ -45,7 +45,20 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             alcanzaría a ver un destello con el tema equivocado. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      {/*
+        `suppressHydrationWarning` aquí es por las extensiones del navegador, no
+        por nuestro código: Grammarly y similares le cuelgan atributos al <body>
+        (`data-gr-ext-installed`, `data-new-gr-c-s-check-loaded`) antes de que
+        React hidrate, y React lo reporta como desajuste.
+
+        Cuesta nada porque solo aplica a este elemento y un nivel de
+        profundidad: el className del <body> es una cadena fija, así que no hay
+        ningún desajuste real que se pueda estar escondiendo, y los de los hijos
+        se siguen reportando igual.
+      */}
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        {children}
+      </body>
     </html>
   );
 }

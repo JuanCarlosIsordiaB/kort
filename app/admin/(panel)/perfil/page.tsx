@@ -14,7 +14,7 @@ export default async function PerfilPage() {
 
   return (
     <div className="max-w-xl">
-      <h1 className="mb-1 text-3xl font-extrabold">Mi perfil</h1>
+      <h1 className="mb-1 text-2xl font-extrabold sm:text-3xl">Mi perfil</h1>
       <p className="mb-8 text-sm text-muted">
         Tu nombre y tu foto salen en la firma de las notas que publicas.
       </p>

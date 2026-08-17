@@ -19,7 +19,7 @@ export function OpinionRow({ items }: { items: NewsWithCategory[] }) {
           <Link
             key={item.id}
             href={`/noticias/${item.slug}`}
-            className="flex items-start gap-4 rounded-[var(--radius-card)] bg-card p-[18px] shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-card-hover)]"
+            className="kort-reveal flex items-start gap-4 rounded-[var(--radius-card)] bg-card p-[18px] shadow-[var(--shadow-card)] transition-shadow ease-soft hover:shadow-[var(--shadow-card-hover)]"
           >
             {/* La foto del autor si ya subió una; si no, sus iniciales. */}
             {item.author_avatar_url ? (

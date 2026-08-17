@@ -79,7 +79,7 @@ export function ShareButtons({ url, title }: { url: string; title: string }) {
 }
 
 const buttonClass =
-  "rounded-[var(--radius-pill)] border border-border-strong px-4 py-2 text-[11px] font-extrabold tracking-[1.2px] transition-colors hover:border-blue hover:bg-blue hover:text-white";
+  "rounded-[var(--radius-pill)] border border-border-strong px-4 py-2 text-[11px] font-extrabold tracking-[1.2px] transition-colors hover:border-foreground hover:bg-foreground hover:text-background";
 
 function A({ href, children }: { href: string; children: React.ReactNode }) {
   return (

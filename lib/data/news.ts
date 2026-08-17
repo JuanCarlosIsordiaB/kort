@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabasePublic } from "@/lib/supabase/public";
+import { dayBoundaryInstant, NO_CATEGORY, type DateField } from "@/lib/news-filters";
 import { readMinutes, uniqueSlug } from "@/lib/slug";
 import type {
   News,
@@ -92,14 +93,71 @@ export async function getPublishedBySlug(slug: string): Promise<NewsWithImages |
 // Lecturas del panel (service role: ve borradores)
 // ---------------------------------------------------------------------------
 
-export async function listAllForAdmin(): Promise<NewsWithCategory[]> {
-  const { data, error } = await supabaseAdmin()
+export interface AdminNewsFilters {
+  /** Texto libre; se busca en título y extracto. */
+  q?: string;
+  status?: NewsStatus;
+  /** Id de categoría, o `NO_CATEGORY` para las notas sin sección. */
+  categoryId?: string;
+  /** Sobre qué columna aplican `from`/`to`. */
+  dateField?: DateField;
+  /** Días "YYYY-MM-DD" en la zona del sitio, ambos inclusive. */
+  from?: string;
+  to?: string;
+}
+
+/**
+ * PostgREST separa los filtros de `or()` por comas y delimita los valores con
+ * comillas dobles. Un término con una coma o un paréntesis rompería la
+ * expresión — o peor, colaría otro filtro — así que se cita siempre y se
+ * escapan las comillas y las barras.
+ *
+ * `%` y `_` se dejan pasar: en `ilike` son comodines, y en una caja de búsqueda
+ * eso es una función, no un agujero.
+ */
+function likeValue(term: string): string {
+  const escaped = term.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `"%${escaped}%"`;
+}
+
+export async function listAllForAdmin(
+  filters: AdminNewsFilters = {},
+): Promise<NewsWithCategory[]> {
+  let query = supabaseAdmin()
     .from("news")
     .select(`${PUBLIC_COLUMNS}, status, created_at, updated_at`)
     .order("updated_at", { ascending: false });
 
+  const term = filters.q?.trim();
+  if (term) {
+    query = query.or(`title.ilike.${likeValue(term)},excerpt.ilike.${likeValue(term)}`);
+  }
+
+  if (filters.status) query = query.eq("status", filters.status);
+
+  if (filters.categoryId === NO_CATEGORY) query = query.is("category_id", null);
+  else if (filters.categoryId) query = query.eq("category_id", filters.categoryId);
+
+  // Filtrar por `published_at` descarta solo los borradores, que es justo lo que
+  // significa preguntar por lo publicado en unas fechas: un NULL nunca cae en un
+  // rango.
+  const column = filters.dateField ?? "updated_at";
+  if (filters.from) query = query.gte(column, dayBoundaryInstant(filters.from, "start"));
+  if (filters.to) query = query.lte(column, dayBoundaryInstant(filters.to, "end"));
+
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as NewsWithCategory[];
+}
+
+/** Cuántas noticias hay en total, para poder decir "6 de 40" al filtrar. */
+export async function countAllForAdmin(): Promise<number> {
+  const { count, error } = await supabaseAdmin()
+    .from("news")
+    .select("id", { count: "exact", head: true });
+
+  if (error) throw new Error(error.message);
+  return count ?? 0;
 }
 
 export async function getNewsById(id: string): Promise<News | null> {

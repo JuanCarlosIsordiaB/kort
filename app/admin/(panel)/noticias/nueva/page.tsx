@@ -10,7 +10,7 @@ export default async function NuevaNoticiaPage() {
 
   return (
     <div className="max-w-3xl">
-      <h1 className="mb-6 text-3xl font-extrabold">Nueva noticia</h1>
+      <h1 className="mb-6 text-2xl font-extrabold sm:text-3xl">Nueva noticia</h1>
       <NewsForm categories={categories} />
     </div>
   );

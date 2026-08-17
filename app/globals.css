@@ -12,13 +12,20 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
+  /*
+    Con qué tema pinta el navegador lo que dibuja él y no nosotros: el
+    desplegable de los <select>, el calendario de <input type="date">, las
+    barras de scroll y el resaltado de selección. Va junto a los tokens porque
+    es parte del tema, y tiene que declararse en los tres estados igual que
+    ellos: sin esto el navegador asume claro siempre.
+  */
+  color-scheme: light;
+
   /* Marca — iguales en ambos temas */
   --kort-navy: #0a1931;
   --kort-ivory: #fff6e8;
 
-  /* Azul de interacción: el hover de todo lo clickeable, igual en ambos temas. */
-  --blue: #1741d6;
-  /* Naranja de apoyo (énfasis dentro del cuerpo de la nota). */
+  /* Naranja de apoyo: énfasis en el cuerpo de la nota y avisos de error. */
   --orange: #e4761b;
 
   /* Tema claro (default) */
@@ -30,8 +37,14 @@
   --border-strong: rgba(10, 25, 49, 0.26);
   --chip: rgba(10, 25, 49, 0.04);
   --input: rgba(10, 25, 49, 0.03);
-  --accent: var(--blue);
-  --accent-foreground: #ffffff;
+  /*
+    El acento es la propia tinta, no un color aparte: en claro sale navy sobre
+    marfil y en oscuro marfil sobre navy. Por eso se define una sola vez y no se
+    repite en los bloques de tema — `var()` se resuelve contra el `--foreground`
+    que esté activo, así que se voltea solo.
+  */
+  --accent: var(--foreground);
+  --accent-foreground: var(--background);
 
   /* Las tarjetas se separan del fondo con sombra en vez de con borde. En claro
      la sombra se tiñe de navy para que no se vea gris sucia sobre el marfil. */
@@ -39,11 +52,23 @@
     0 1px 2px rgba(10, 25, 49, 0.05), 0 8px 24px -12px rgba(10, 25, 49, 0.18);
   --shadow-card-hover:
     0 2px 6px rgba(10, 25, 49, 0.08), 0 20px 40px -16px rgba(10, 25, 49, 0.32);
+
+  /*
+    Movimiento. Una sola curva para todo lo que entra o responde al cursor: sale
+    rápido y frena largo, que es lo que hace que un desplazamiento chico se lea
+    como intencional y no como un salto. Las duraciones son las tres que se
+    usan: micro (color), respuesta (elevación) y entrada (aparición).
+  */
+  --ease-out-soft: cubic-bezier(0.16, 0.84, 0.44, 1);
+  --dur-fast: 140ms;
+  --dur-base: 240ms;
+  --dur-slow: 620ms;
 }
 
 /* Sin elección explícita, seguimos la preferencia del sistema. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --background: #0a1931;
     --card: rgba(255, 246, 232, 0.03);
     --foreground: #fff6e8;
@@ -52,8 +77,6 @@
     --border-strong: rgba(255, 246, 232, 0.26);
     --chip: rgba(255, 246, 232, 0.06);
     --input: rgba(255, 246, 232, 0.05);
-    /* En oscuro el azul se aclara para no perderse contra el navy. */
-    --accent: #6c90ff;
     --shadow-card:
       0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.65);
     --shadow-card-hover:
@@ -63,6 +86,7 @@
 
 /* El toggle gana sobre la preferencia del sistema, en ambos sentidos. */
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --background: #0a1931;
   --card: rgba(255, 246, 232, 0.03);
   --foreground: #fff6e8;
@@ -71,7 +95,6 @@
   --border-strong: rgba(255, 246, 232, 0.26);
   --chip: rgba(255, 246, 232, 0.06);
   --input: rgba(255, 246, 232, 0.05);
-  --accent: #6c90ff;
   --shadow-card:
     0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.65);
   --shadow-card-hover:
@@ -118,10 +141,12 @@
   --color-input: var(--input);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --color-blue: var(--blue);
   --color-orange: var(--orange);
   --color-navy: var(--kort-navy);
   --color-ivory: var(--kort-ivory);
+
+  /* Expone la curva como utilidad `ease-soft` de Tailwind. */
+  --ease-soft: var(--ease-out-soft);
 
   --font-sans: var(--font-manrope);
 
@@ -139,6 +164,138 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  /* El cambio de tema deja de ser un parpadeo y pasa a ser un fundido. */
+  transition:
+    background-color var(--dur-base) var(--ease-out-soft),
+    color var(--dur-base) var(--ease-out-soft);
+}
+
+/*
+  ─────────────────────────────────────────────────────────────────────────────
+  Movimiento
+
+  Un solo gesto en todo el sitio: subir unos píxeles mientras se aparece. Se usa
+  de dos maneras — al cargar (`kort-stagger`, escalonado) y al entrar en pantalla
+  (`kort-reveal`) — para que la página se sienta continua sin inventar un efecto
+  distinto por sección.
+  ─────────────────────────────────────────────────────────────────────────────
+*/
+@keyframes kort-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* El panel del menú cuelga del masthead, así que entra bajando, no subiendo. */
+@keyframes kort-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.kort-drop {
+  animation: kort-drop var(--dur-base) var(--ease-out-soft) both;
+}
+
+/*
+  Entrada escalonada de los hijos directos. El retardo se corta en el quinto:
+  más allá el contenido ya está fuera de pantalla y escalonarlo solo retrasaría
+  la lectura de quien baja rápido.
+*/
+.kort-stagger > * {
+  animation: kort-rise var(--dur-slow) var(--ease-out-soft) both;
+}
+.kort-stagger > *:nth-child(2) {
+  animation-delay: 70ms;
+}
+.kort-stagger > *:nth-child(3) {
+  animation-delay: 140ms;
+}
+.kort-stagger > *:nth-child(4) {
+  animation-delay: 210ms;
+}
+.kort-stagger > *:nth-child(n + 5) {
+  animation-delay: 280ms;
+}
+
+/*
+  Revelado ligado al scroll, sin JavaScript ni observadores.
+
+  Va dentro de `@supports` a propósito: donde no hay `animation-timeline` la
+  regla entera se descarta y el contenido se pinta normal. Si esto se hiciera
+  con `opacity: 0` por defecto y una clase que lo revierte, un navegador sin
+  soporte dejaría la portada en blanco.
+*/
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .kort-reveal {
+      animation: kort-rise auto var(--ease-out-soft) both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 55%;
+    }
+  }
+}
+
+/*
+  Foco visible unificado. Va con `:where()` para tener especificidad cero: no le
+  gana a ningún componente que quiera el suyo, pero cubre todo lo demás.
+*/
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/*
+  Interruptor general de accesibilidad. Con "menos movimiento" activado no se
+  quitan las animaciones (eso dejaría en `opacity: 0` lo que use `both`), se
+  colapsan a un instante: el estado final es el mismo, sin recorrido.
+*/
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+  Campos del panel en móvil.
+
+  Safari de iOS hace zoom automático al enfocar un campo con texto menor a 16px,
+  y al volver deja la página desplazada y con el layout corrido. Los campos del
+  panel son `text-sm` (14px) por diseño, así que en pantalla angosta se suben a
+  16px: es la única forma de evitar el zoom sin cambiar el desktop.
+*/
+@media (max-width: 640px) {
+  .admin-shell :is(input, select, textarea) {
+    font-size: 16px;
+  }
+}
+
+/*
+  El desplegable nativo hereda el fondo del <select>, y el nuestro es
+  translúcido (`--input`) para que se funda con la tarjeta. Compuesto contra el
+  popup del sistema eso dejaba el texto marfil sobre blanco al abrirlo en
+  oscuro. `color-scheme` ya lo resuelve en los navegadores que lo respetan del
+  todo; esto lo fija con colores opacos para los que igual usan el fondo que
+  puso el autor.
+*/
+.admin-shell option {
+  background-color: var(--background);
+  color: var(--foreground);
 }
 
 /*
@@ -180,9 +337,23 @@ body {
 .kort-prose ol {
   list-style: decimal;
 }
+/*
+  El subrayado engorda y se separa en hover. Se anima el subrayado y no un
+  pseudo-elemento porque así sigue partiéndose bien cuando el enlace cae en dos
+  renglones, y porque ninguna de las dos propiedades reflowea el texto.
+*/
 .kort-prose a {
   color: var(--accent);
   text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  transition:
+    text-decoration-thickness var(--dur-fast) var(--ease-out-soft),
+    text-underline-offset var(--dur-fast) var(--ease-out-soft);
+}
+.kort-prose a:hover {
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
 }
 .kort-prose u {
   text-decoration-color: var(--accent);

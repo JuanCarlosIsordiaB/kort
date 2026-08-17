@@ -74,7 +74,7 @@ export function MobileNav({ categories }: { categories: Category[] }) {
       {open && (
         <div
           id="mobile-nav-panel"
-          className="absolute top-full right-0 left-0 z-50 border-b border-border-strong bg-background px-6 pt-2 pb-5 shadow-[var(--shadow-card)]"
+          className="kort-drop absolute top-full right-0 left-0 z-50 border-b border-border-strong bg-background px-6 pt-2 pb-5 shadow-[var(--shadow-card)]"
         >
           <nav className="flex flex-col">
             {categories.map((category) => (

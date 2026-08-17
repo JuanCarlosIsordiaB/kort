@@ -60,7 +60,8 @@ export function PerfilForm({ admin }: { admin: PublicAdmin }) {
 
   return (
     <form onSubmit={save} className="flex flex-col gap-6">
-      <div className="flex items-center gap-4">
+      {/* El selector de archivo es ancho: en móvil va debajo del avatar. */}
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
         {avatarUrl ? (
           // Imagen ya subida a Supabase; <img> basta para la vista previa.
           // eslint-disable-next-line @next/next/no-img-element
@@ -75,7 +76,7 @@ export function PerfilForm({ admin }: { admin: PublicAdmin }) {
           </span>
         )}
 
-        <div className="flex flex-col gap-2">
+        <div className="flex min-w-0 flex-col gap-2">
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp,image/avif"
@@ -135,7 +136,7 @@ export function PerfilForm({ admin }: { admin: PublicAdmin }) {
       <button
         type="submit"
         disabled={pending}
-        className="self-start rounded-[var(--radius-pill)] bg-accent px-5 py-2 text-sm font-bold text-accent-foreground disabled:opacity-60"
+        className="rounded-[var(--radius-pill)] bg-accent px-5 py-3 text-sm font-bold text-accent-foreground disabled:opacity-60 max-sm:w-full sm:self-start sm:py-2"
       >
         {pending ? "Guardando…" : "Guardar perfil"}
       </button>

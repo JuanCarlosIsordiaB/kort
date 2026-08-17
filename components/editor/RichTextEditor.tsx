@@ -168,7 +168,7 @@ export function RichTextEditor({
       />
 
       {error && (
-        <p className="border-b border-border bg-chip px-4 py-2 text-sm text-accent">{error}</p>
+        <p className="border-b border-border bg-chip px-4 py-2 text-sm text-orange">{error}</p>
       )}
 
       <EditorContent editor={editor} />
@@ -206,7 +206,7 @@ function HeadlineToolbar({ editor }: { editor: Editor }) {
       >
         <span className="bg-foreground text-background px-1">Aa</span>
       </Btn>
-      <span className="ml-1 text-xs font-semibold text-muted">
+      <span className="basis-full text-xs font-semibold text-muted sm:ml-1 sm:basis-auto">
         Resalta la parte del titular que quieres en recuadro
       </span>
     </div>
@@ -296,7 +296,7 @@ function Toolbar({
 
       <select
         aria-label="Color de texto"
-        className="rounded-[var(--radius-thumb)] border border-border bg-background px-2 py-1 text-xs font-semibold"
+        className="min-w-0 max-w-[45%] rounded-[var(--radius-thumb)] border border-border bg-background px-2 py-1 text-xs font-semibold sm:max-w-none"
         value={(editor.getAttributes("textStyle").color as string) ?? ""}
         onChange={(e) => {
           const value = e.target.value;
@@ -313,7 +313,7 @@ function Toolbar({
 
       <select
         aria-label="Resaltado"
-        className="rounded-[var(--radius-thumb)] border border-border bg-background px-2 py-1 text-xs font-semibold"
+        className="min-w-0 max-w-[45%] rounded-[var(--radius-thumb)] border border-border bg-background px-2 py-1 text-xs font-semibold sm:max-w-none"
         value={(editor.getAttributes("highlight").color as string) ?? ""}
         onChange={(e) => {
           const value = e.target.value;
@@ -371,6 +371,8 @@ function Btn({
   title: string;
   children: React.ReactNode;
 }) {
+  // `min-h-9` en móvil: con `py-1` los botones quedaban de 28px y en pantalla
+  // táctil se fallaba el que estaba al lado.
   return (
     <button
       type="button"
@@ -379,7 +381,7 @@ function Btn({
       aria-pressed={active}
       disabled={disabled}
       onClick={onClick}
-      className={`min-w-8 rounded-[var(--radius-thumb)] px-2 py-1 text-sm font-semibold transition-colors disabled:opacity-40 ${
+      className={`min-h-9 min-w-9 rounded-[var(--radius-thumb)] px-2 text-sm font-semibold transition-colors disabled:opacity-40 sm:min-h-0 sm:min-w-8 sm:py-1 ${
         active ? "bg-accent text-accent-foreground" : "hover:bg-border"
       }`}
     >

@@ -5,7 +5,9 @@ import { notFound } from "next/navigation";
 
 import { formatPublishedAt } from "@/components/news/NewsCard";
 import { NewsGallery } from "@/components/news/NewsGallery";
+import { ReadingProgress } from "@/components/news/ReadingProgress";
 import { ShareButtons } from "@/components/news/ShareButtons";
+import { BackToTop } from "@/components/site/BackToTop";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { getPublishedBySlug } from "@/lib/data/news";
@@ -64,7 +66,15 @@ export default async function NoticiaPage(props: PageProps<"/noticias/[slug]">) 
     <>
       <SiteHeader />
 
-      <main className="mx-auto w-full max-w-[720px] flex-1 px-6 py-12">
+      {/* Mide el <main>: la lectura empieza en el titular, no en el masthead. */}
+      <ReadingProgress targetId="nota" />
+
+      {/* `kort-stagger` escalona la entrada de los hijos directos: pill, titular,
+          entradilla, firma, compartir, galería y cuerpo, en ese orden. */}
+      <main
+        id="nota"
+        className="kort-stagger mx-auto w-full max-w-[720px] flex-1 px-6 py-12"
+      >
         {news.category && (
           <Link
             href={`/categoria/${news.category.slug}`}
@@ -102,6 +112,8 @@ export default async function NoticiaPage(props: PageProps<"/noticias/[slug]">) 
           dangerouslySetInnerHTML={{ __html: news.content_html ?? "" }}
         />
       </main>
+
+      <BackToTop />
 
       <SiteFooter />
     </>

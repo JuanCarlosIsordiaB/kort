@@ -22,7 +22,7 @@ export function formatPublishedAt(value: string | null): string | null {
  */
 export function NewsCard({ news }: { news: NewsWithCategory }) {
   return (
-    <article className="flex flex-col overflow-hidden rounded-[var(--radius-card)] bg-card shadow-[var(--shadow-card)] transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[var(--shadow-card-hover)]">
+    <article className="kort-reveal group flex flex-col overflow-hidden rounded-[var(--radius-card)] bg-card shadow-[var(--shadow-card)] transition-all duration-200 ease-soft hover:-translate-y-[3px] hover:shadow-[var(--shadow-card-hover)]">
       <Link href={`/noticias/${news.slug}`} className="block">
         {news.cover_image_url ? (
           <Image
@@ -30,7 +30,7 @@ export function NewsCard({ news }: { news: NewsWithCategory }) {
             alt=""
             width={640}
             height={360}
-            className="h-40 w-full object-cover"
+            className="h-40 w-full object-cover transition-transform duration-500 ease-soft group-hover:scale-[1.04]"
           />
         ) : (
           <div className="h-40 w-full bg-chip" />

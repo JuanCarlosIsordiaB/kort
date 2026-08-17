@@ -19,7 +19,7 @@ export default async function PortadaPage() {
 
   return (
     <div className="max-w-3xl">
-      <h1 className="mb-1 text-3xl font-extrabold">Portada</h1>
+      <h1 className="mb-1 text-2xl font-extrabold sm:text-3xl">Portada</h1>
       <p className="mb-8 text-sm text-muted">
         Elige qué va en cada bloque de la página de inicio. Lo que dejes vacío se llena solo
         con lo más reciente, así que la portada nunca se ve rota.

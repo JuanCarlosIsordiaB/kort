@@ -51,7 +51,7 @@ export async function SiteHeader({ compact = false }: { compact?: boolean }) {
             modo compacto no hay menú, así que se queda visible siempre. */}
         <Link
           href="/#boletin"
-          className={`whitespace-nowrap rounded-[var(--radius-pill)] border border-border-strong px-5 py-2.5 text-xs font-extrabold tracking-[1.2px] transition-colors hover:border-blue hover:bg-blue hover:text-white ${
+          className={`whitespace-nowrap rounded-[var(--radius-pill)] border border-border-strong px-5 py-2.5 text-xs font-extrabold tracking-[1.2px] transition-colors hover:border-foreground hover:bg-foreground hover:text-background ${
             compact ? "" : "hidden md:inline-block"
           }`}
         >

@@ -11,7 +11,7 @@ export default async function CategoriasPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="mb-1 text-3xl font-extrabold">Secciones</h1>
+      <h1 className="mb-1 text-2xl font-extrabold sm:text-3xl">Secciones</h1>
       <p className="mb-6 text-sm text-muted">
         Las secciones que aparecen en la navegación del sitio. Puedes agregar o quitar las que
         quieras sin tocar el código.

@@ -102,13 +102,14 @@ export function NewsForm({ categories, news, images: initialImages = [] }: NewsF
         />
       </label>
 
-      <div className="flex flex-wrap gap-6">
-        <label className="flex flex-col gap-1">
+      {/* En una columna en móvil: lado a lado los dos selectores no cabían. */}
+      <div className="grid gap-4 sm:grid-cols-2 sm:gap-6">
+        <label className="flex min-w-0 flex-col gap-1">
           <span className="text-xs font-bold uppercase tracking-wide text-muted">Sección</span>
           <select
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value)}
-            className="rounded-[var(--radius-thumb)] border border-border bg-input px-3 py-2 text-sm"
+            className="w-full min-w-0 rounded-[var(--radius-thumb)] border border-border bg-input px-3 py-2 text-sm"
           >
             <option value="">Sin sección</option>
             {categories.map((category) => (
@@ -119,12 +120,12 @@ export function NewsForm({ categories, news, images: initialImages = [] }: NewsF
           </select>
         </label>
 
-        <label className="flex flex-col gap-1">
+        <label className="flex min-w-0 flex-col gap-1">
           <span className="text-xs font-bold uppercase tracking-wide text-muted">Estado</span>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as NewsStatus)}
-            className="rounded-[var(--radius-thumb)] border border-border bg-input px-3 py-2 text-sm"
+            className="w-full min-w-0 rounded-[var(--radius-thumb)] border border-border bg-input px-3 py-2 text-sm"
           >
             <option value="draft">Borrador</option>
             <option value="published">Publicada</option>
@@ -147,13 +148,13 @@ export function NewsForm({ categories, news, images: initialImages = [] }: NewsF
         <RichTextEditor initialContent={news?.content ?? undefined} onChange={setContent} />
       </div>
 
-      {error && <p className="text-sm font-semibold text-accent">{error}</p>}
+      {error && <p className="text-sm font-semibold text-orange">{error}</p>}
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <button
           type="submit"
           disabled={pending}
-          className="rounded-[var(--radius-pill)] bg-accent px-5 py-2 text-sm font-bold text-accent-foreground disabled:opacity-60"
+          className="rounded-[var(--radius-pill)] bg-accent px-5 py-3 text-sm font-bold text-accent-foreground disabled:opacity-60 max-sm:w-full sm:py-2"
         >
           {pending ? "Guardando…" : status === "published" ? "Guardar y publicar" : "Guardar borrador"}
         </button>
