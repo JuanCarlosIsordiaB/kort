@@ -1,0 +1,80 @@
+import Image from "next/image";
+import Link from "next/link";
+
+import { readUpper, shortDateUpper, upper } from "@/lib/format";
+import type { NewsWithCategory } from "@/lib/types";
+
+/**
+ * El paquete principal de la portada: pill de sección, titular grande, extracto,
+ * byline, botón y foto.
+ *
+ * El titular puede venir de `headlineHtml` (escrito con Tiptap desde el panel,
+ * donde la marca `highlight` produce el recuadro invertido del diseño). Si no
+ * hay titular curado, se usa el título de la nota tal cual.
+ */
+export function LeadPackage({
+  news,
+  headlineHtml,
+}: {
+  news: NewsWithCategory;
+  headlineHtml: string | null;
+}) {
+  return (
+    <div className="border-border px-6 py-11 md:px-10 lg:border-r">
+      {news.category && (
+        <Link
+          href={`/categoria/${news.category.slug}`}
+          className="inline-block rounded-[var(--radius-tag)] border border-border-strong px-3 py-1.5 text-[10px] font-extrabold tracking-[1.6px] transition-colors hover:border-foreground hover:bg-foreground hover:text-background"
+        >
+          {upper(news.category.name)}
+        </Link>
+      )}
+
+      {headlineHtml ? (
+        <h1
+          className="kort-headline mt-5 mb-4"
+          dangerouslySetInnerHTML={{ __html: headlineHtml }}
+        />
+      ) : (
+        <h1 className="kort-headline mt-5 mb-4">{news.title}</h1>
+      )}
+
+      {news.excerpt && (
+        <p className="mb-4 max-w-[540px] text-base leading-relaxed text-muted">
+          {news.excerpt}
+        </p>
+      )}
+
+      <div className="mb-5 flex flex-wrap items-center gap-2.5 border-t border-border pt-3.5 text-[11px] font-extrabold tracking-[1.2px] text-muted">
+        {[upper(news.author_name), shortDateUpper(news.published_at), readUpper(news.read_minutes)]
+          .filter(Boolean)
+          .map((part, i, all) => (
+            <span key={part} className="flex items-center gap-2.5">
+              {part}
+              {i < all.length - 1 && <span aria-hidden>—</span>}
+            </span>
+          ))}
+      </div>
+
+      <Link
+        href={`/noticias/${news.slug}`}
+        className="mb-6 inline-block rounded-[var(--radius-pill)] border border-foreground bg-foreground px-6 py-3 text-[11px] font-extrabold tracking-[1.2px] text-background transition-colors hover:border-blue hover:bg-blue hover:text-white"
+      >
+        LEER LA NOTA →
+      </Link>
+
+      {news.cover_image_url && (
+        <Link href={`/noticias/${news.slug}`} className="block">
+          <Image
+            src={news.cover_image_url}
+            alt=""
+            width={1280}
+            height={640}
+            priority
+            className="h-[320px] w-full rounded-[var(--radius-hero)] object-cover shadow-[var(--shadow-card)]"
+          />
+        </Link>
+      )}
+    </div>
+  );
+}

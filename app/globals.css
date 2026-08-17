@@ -1,0 +1,257 @@
+@import "tailwindcss";
+
+/*
+  Tokens del handoff de diseño:
+  "Kort news page design (1)/design_handoff_kort_news/README.md" §Design Tokens
+
+  Los dos temas se definen desde ahora aunque el toggle se implemente después:
+  retrofitear dark mode obliga a reescribir cada clase de color.
+*/
+
+/* Permite usar `dark:` en Tailwind cuando el tema se fija por atributo. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  /* Marca — iguales en ambos temas */
+  --kort-navy: #0a1931;
+  --kort-ivory: #fff6e8;
+
+  /* Azul de interacción: el hover de todo lo clickeable, igual en ambos temas. */
+  --blue: #1741d6;
+  /* Naranja de apoyo (énfasis dentro del cuerpo de la nota). */
+  --orange: #e4761b;
+
+  /* Tema claro (default) */
+  --background: #fff6e8;
+  --card: #fff6e8;
+  --foreground: #0a1931;
+  --muted: rgba(10, 25, 49, 0.6);
+  --border: rgba(10, 25, 49, 0.12);
+  --border-strong: rgba(10, 25, 49, 0.26);
+  --chip: rgba(10, 25, 49, 0.04);
+  --input: rgba(10, 25, 49, 0.03);
+  --accent: var(--blue);
+  --accent-foreground: #ffffff;
+
+  /* Las tarjetas se separan del fondo con sombra en vez de con borde. En claro
+     la sombra se tiñe de navy para que no se vea gris sucia sobre el marfil. */
+  --shadow-card:
+    0 1px 2px rgba(10, 25, 49, 0.05), 0 8px 24px -12px rgba(10, 25, 49, 0.18);
+  --shadow-card-hover:
+    0 2px 6px rgba(10, 25, 49, 0.08), 0 20px 40px -16px rgba(10, 25, 49, 0.32);
+}
+
+/* Sin elección explícita, seguimos la preferencia del sistema. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #0a1931;
+    --card: rgba(255, 246, 232, 0.03);
+    --foreground: #fff6e8;
+    --muted: rgba(255, 246, 232, 0.6);
+    --border: rgba(255, 246, 232, 0.14);
+    --border-strong: rgba(255, 246, 232, 0.26);
+    --chip: rgba(255, 246, 232, 0.06);
+    --input: rgba(255, 246, 232, 0.05);
+    /* En oscuro el azul se aclara para no perderse contra el navy. */
+    --accent: #6c90ff;
+    --shadow-card:
+      0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.65);
+    --shadow-card-hover:
+      0 2px 6px rgba(0, 0, 0, 0.5), 0 20px 40px -16px rgba(0, 0, 0, 0.8);
+  }
+}
+
+/* El toggle gana sobre la preferencia del sistema, en ambos sentidos. */
+:root[data-theme="dark"] {
+  --background: #0a1931;
+  --card: rgba(255, 246, 232, 0.03);
+  --foreground: #fff6e8;
+  --muted: rgba(255, 246, 232, 0.6);
+  --border: rgba(255, 246, 232, 0.14);
+  --border-strong: rgba(255, 246, 232, 0.26);
+  --chip: rgba(255, 246, 232, 0.06);
+  --input: rgba(255, 246, 232, 0.05);
+  --accent: #6c90ff;
+  --shadow-card:
+    0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.65);
+  --shadow-card-hover:
+    0 2px 6px rgba(0, 0, 0, 0.5), 0 20px 40px -16px rgba(0, 0, 0, 0.8);
+}
+
+/*
+  Etiquetas que dependen del tema activo (el botón de ThemeToggle). El valor de
+  `data-theme-when` es el tema en el que ese texto debe verse.
+
+  Se resuelve en CSS y no con estado de React para que el botón diga lo correcto
+  desde el primer pintado, antes de que hidrate. Lo que queda en `display:none`
+  sale del árbol de accesibilidad, así que el nombre accesible del botón sigue
+  siendo el de la etiqueta visible.
+*/
+[data-theme-when="dark"] {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) [data-theme-when="light"] {
+    display: none;
+  }
+  :root:not([data-theme="light"]) [data-theme-when="dark"] {
+    display: inline;
+  }
+}
+
+:root[data-theme="dark"] [data-theme-when="light"] {
+  display: none;
+}
+:root[data-theme="dark"] [data-theme-when="dark"] {
+  display: inline;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-chip: var(--chip);
+  --color-input: var(--input);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-blue: var(--blue);
+  --color-orange: var(--orange);
+  --color-navy: var(--kort-navy);
+  --color-ivory: var(--kort-ivory);
+
+  --font-sans: var(--font-manrope);
+
+  /* Radios del prototipo (Kort.dc.html) */
+  --radius-frame: 16px; /* marco de la portada */
+  --radius-card: 10px; /* tarjetas y filas del sidebar */
+  --radius-hero: 8px; /* imagen del lead */
+  --radius-thumb: 6px; /* miniaturas de 62px */
+  --radius-tag: 4px; /* pill de categoría del lead */
+  --radius-avatar: 2px; /* avatar de iniciales de Opinión */
+  --radius-pill: 999px; /* botones y chips */
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+}
+
+/*
+  Estilos del HTML generado por Tiptap. El editor guarda HTML plano sin clases,
+  así que el detalle de la noticia (y el propio editor) dependen de estas reglas
+  para que lo escrito se vea igual que como se escribió.
+*/
+.kort-prose h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.15;
+  margin: 1.6rem 0 0.8rem;
+}
+.kort-prose h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin: 1.4rem 0 0.7rem;
+}
+.kort-prose h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 1.2rem 0 0.6rem;
+}
+.kort-prose p {
+  font-size: 1.125rem;
+  line-height: 1.7;
+  margin: 0 0 1.1rem;
+}
+.kort-prose ul,
+.kort-prose ol {
+  margin: 0 0 1.1rem 1.4rem;
+  line-height: 1.7;
+}
+.kort-prose ul {
+  list-style: disc;
+}
+.kort-prose ol {
+  list-style: decimal;
+}
+.kort-prose a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.kort-prose u {
+  text-decoration-color: var(--accent);
+}
+.kort-prose strong {
+  font-weight: 700;
+}
+.kort-prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-hero);
+  margin: 1.4rem 0;
+}
+.kort-prose blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 1rem;
+  margin: 0 0 1.1rem;
+  color: var(--muted);
+}
+.kort-prose code {
+  background: var(--chip);
+  border-radius: 6px;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.9em;
+}
+
+/*
+  Titular del lead de la portada. Se escribe con Tiptap, y la marca `highlight`
+  del editor se pinta como el recuadro invertido del diseño: fondo del color del
+  texto, texto del color del fondo, con el box-shadow lateral que le da el aire
+  de plumón sobre varias líneas.
+*/
+.kort-headline {
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1.34;
+  letter-spacing: -1px;
+  max-width: 620px;
+}
+.kort-headline p {
+  margin: 0;
+}
+.kort-headline mark {
+  background: var(--foreground);
+  color: var(--background);
+  padding: 1px 10px;
+  box-shadow:
+    6px 0 0 var(--foreground),
+    -6px 0 0 var(--foreground);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+@media (max-width: 900px) {
+  .kort-headline {
+    font-size: 32px;
+    letter-spacing: -0.5px;
+  }
+}
+
+/* El área editable de Tiptap necesita altura propia y quitar el outline. */
+.kort-prose.ProseMirror {
+  outline: none;
+  min-height: 20rem;
+}
+.kort-prose.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--muted);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
