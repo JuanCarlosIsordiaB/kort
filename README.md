@@ -50,6 +50,35 @@ No hay registro público: los admins se dan de alta solo con `seed:admin`.
 
 ---
 
+## Mantener viva la base
+
+Supabase free **pausa el proyecto tras 7 días sin actividad**, y despausarlo es
+manual desde el dashboard. `.github/workflows/keep-alive.yml` corre cada dos
+días y hace una consulta de lectura contra `categories`; con eso el contador
+nunca pasa de ~48 h.
+
+Para que funcione hay que dar de alta dos secretos en el repo
+(*Settings > Secrets and variables > Actions*):
+
+| Secreto             | Valor                                     |
+| ------------------- | ----------------------------------------- |
+| `SUPABASE_URL`      | el mismo de `NEXT_PUBLIC_SUPABASE_URL`    |
+| `SUPABASE_ANON_KEY` | el mismo de `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
+| `SITE_URL`          | opcional — si lo pones, también pinguea `/api/health` |
+
+El workflow pega **directo a la API de Supabase**, no al sitio: así el
+keep-alive no depende de que el despliegue esté arriba. `GET /api/health`
+existe aparte, hace la misma consulta desde el servidor de Next y responde
+`{ ok, db, categories, ms }` — sirve para un monitor externo (UptimeRobot,
+cron-job.org) o para verificar a mano que la app ve la base.
+
+> Dos cosas que conviene saber: el service role **no** va en el workflow —la
+> anon key ya viaja al navegador por diseño y alcanza para leer categorías—, y
+> GitHub deshabilita los workflows programados en repos sin commits durante 60
+> días. Avisa por correo y se reactivan con un clic en la pestaña Actions.
+
+---
+
 ## Cómo está organizado
 
 ```

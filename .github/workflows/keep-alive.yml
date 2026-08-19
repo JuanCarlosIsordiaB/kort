@@ -1,0 +1,89 @@
+# Mantiene despierto el proyecto de Supabase.
+#
+# El plan free pausa el proyecto tras 7 días sin actividad y reactivarlo es
+# manual. Este workflow consulta la base cada dos días, así que el contador
+# nunca pasa de ~48 h.
+#
+# Secretos que hay que dar de alta en GitHub
+# (Settings > Secrets and variables > Actions > New repository secret):
+#
+#   SUPABASE_URL       https://xxxxxxxx.supabase.co   (= NEXT_PUBLIC_SUPABASE_URL)
+#   SUPABASE_ANON_KEY  la anon/publishable key        (= NEXT_PUBLIC_SUPABASE_ANON_KEY)
+#   SITE_URL           opcional: https://tu-dominio   (para pingear también el sitio)
+#
+# Las dos primeras ya viajan al navegador por diseño, así que no hay secreto
+# real que filtrar aquí — igual van como secrets para no publicar la URL del
+# proyecto en el repo. El service role NUNCA va en este archivo.
+#
+# Ojo: GitHub deshabilita los workflows programados en repos sin actividad
+# durante 60 días. Avisa por correo y se reactivan con un clic en la pestaña
+# Actions.
+
+name: Keep Supabase awake
+
+on:
+  schedule:
+    # 12:00 UTC (06:00 en CDMX) los días impares del mes: el hueco más largo
+    # entre dos corridas son 2 días, incluso en el salto de mes.
+    - cron: "0 12 */2 * *"
+  workflow_dispatch: # botón "Run workflow" para probarlo a mano
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    # A nivel job: el contexto `env` de un `if` de step no ve las variables
+    # declaradas en ese mismo step, y el paso del sitio se salta con un `if`.
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SITE_URL: ${{ secrets.SITE_URL }}
+
+    steps:
+      - name: Consultar la base
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "Faltan los secretos SUPABASE_URL o SUPABASE_ANON_KEY." >&2
+            exit 1
+          fi
+
+          status=$(curl --silent --show-error --location --max-time 30 \
+            --retry 3 --retry-delay 10 --retry-all-errors \
+            --output /tmp/respuesta.txt --write-out '%{http_code}' \
+            "${SUPABASE_URL}/rest/v1/categories?select=id&limit=1" \
+            --header "apikey: ${SUPABASE_ANON_KEY}" \
+            --header "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+
+          echo "HTTP ${status}"
+          cat /tmp/respuesta.txt
+          echo
+
+          # Un 200 significa que PostgREST llegó a Postgres: eso es lo que
+          # cuenta como actividad. Cualquier otra cosa es fallo real.
+          if [ "${status}" != "200" ]; then
+            echo "La consulta no devolvió 200 — puede que el proyecto ya esté pausado." >&2
+            exit 1
+          fi
+
+      - name: Pingear el sitio
+        # Opcional: solo corre si diste de alta SITE_URL.
+        if: ${{ env.SITE_URL != '' }}
+        run: |
+          set -euo pipefail
+
+          status=$(curl --silent --show-error --location --max-time 30 \
+            --retry 3 --retry-delay 10 --retry-all-errors \
+            --output /tmp/health.txt --write-out '%{http_code}' \
+            "${SITE_URL%/}/api/health")
+
+          echo "HTTP ${status}"
+          cat /tmp/health.txt
+          echo
+
+          if [ "${status}" != "200" ]; then
+            echo "/api/health no devolvió 200." >&2
+            exit 1
+          fi
