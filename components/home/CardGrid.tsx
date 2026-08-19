@@ -2,6 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { readShortUpper, timeAgoUpper, upper } from "@/lib/format";
+import { coverFocusStyle } from "@/lib/image-focus";
+import { punct } from "@/lib/punctuation";
 import type { Category, NewsWithCategory } from "@/lib/types";
 
 /** La barra "AHORA EN KORT" que separa el lead de la rejilla. */
@@ -59,6 +61,7 @@ export function CardGrid({ items }: { items: NewsWithCategory[] }) {
               alt=""
               width={640}
               height={360}
+              style={coverFocusStyle(news)}
               className="h-[150px] w-full object-cover transition-transform duration-500 ease-soft group-hover:scale-[1.04]"
             />
           ) : (
@@ -71,7 +74,7 @@ export function CardGrid({ items }: { items: NewsWithCategory[] }) {
             <div className="mb-2 text-[9px] font-extrabold tracking-[1.4px] text-foreground">
               {upper(news.category?.name) || "KORT"}
             </div>
-            <div className="mb-2.5 text-[15px] font-bold leading-snug">{news.title}</div>
+            <div className="mb-2.5 text-[15px] font-bold leading-snug">{punct(news.title)}</div>
             <div className="text-[9px] font-extrabold tracking-[1.2px] text-muted">
               {[readShortUpper(news.read_minutes), timeAgoUpper(news.published_at)]
                 .filter(Boolean)

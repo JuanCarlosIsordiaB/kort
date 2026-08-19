@@ -3,16 +3,43 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AdSlot } from "@/components/ads/AdSlot";
+import { ArticleBody } from "@/components/news/ArticleBody";
 import { formatPublishedAt } from "@/components/news/NewsCard";
 import { NewsGallery } from "@/components/news/NewsGallery";
 import { ReadingProgress } from "@/components/news/ReadingProgress";
 import { ShareButtons } from "@/components/news/ShareButtons";
 import { BackToTop } from "@/components/site/BackToTop";
+import { JsonLd } from "@/components/site/JsonLd";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader } from "@/components/site/SiteHeader";
-import { getPublishedBySlug } from "@/lib/data/news";
+import { getSiteSettings } from "@/lib/data/home";
+import { getInlineRecommendations, getPublishedBySlug } from "@/lib/data/news";
 import { initials } from "@/lib/format";
-import { absoluteUrl } from "@/lib/site";
+import { punct } from "@/lib/punctuation";
+import { breadcrumbJsonLd, organizationJsonLd } from "@/lib/seo";
+import { absoluteUrl, SITE_URL } from "@/lib/site";
+
+/**
+ * La nota se cachea 5 minutos, igual que la portada.
+ *
+ * Antes se renderizaba entera en cada visita: una consulta a Supabase por
+ * lector para devolver siempre lo mismo. Con la publicidad eso además obligaba
+ * a resolver las campañas vigentes en cada petición.
+ *
+ * Hacen falta las dos exportaciones. `revalidate` por sí solo no activa nada en
+ * una ruta con segmento dinámico: sin `generateStaticParams` la ruta se queda
+ * como totalmente dinámica (ver la nota en los docs de generateStaticParams,
+ * "You must return an empty array ... in order to revalidate (ISR) paths at
+ * runtime"). El arreglo vacío significa "no prerenderices ninguna en el build,
+ * pero cachea cada una la primera vez que alguien la pida" — que es lo correcto
+ * para un sitio de noticias donde las notas nacen después del despliegue.
+ */
+export const revalidate = 300;
+
+export function generateStaticParams() {
+  return [];
+}
 
 export async function generateMetadata(
   props: PageProps<"/noticias/[slug]">,
@@ -20,7 +47,9 @@ export async function generateMetadata(
   const { slug } = await props.params;
   const news = await getPublishedBySlug(slug);
 
-  if (!news) return { title: "Noticia no encontrada" };
+  // Un slug que ya no existe devuelve 404, y una página de error indexada solo
+  // ensucia el sitio en los resultados.
+  if (!news) return { title: "Noticia no encontrada", robots: { index: false } };
 
   const url = absoluteUrl(`/noticias/${news.slug}`);
 
@@ -37,6 +66,7 @@ export async function generateMetadata(
       url,
       type: "article",
       publishedTime: news.published_at ?? undefined,
+      modifiedTime: news.updated_at,
       authors: news.author_name ? [news.author_name] : undefined,
       section: news.category?.name,
     },
@@ -50,20 +80,72 @@ export async function generateMetadata(
 
 export default async function NoticiaPage(props: PageProps<"/noticias/[slug]">) {
   const { slug } = await props.params;
-  const news = await getPublishedBySlug(slug);
+
+  // Los ajustes no dependen de la nota, así que van en paralelo.
+  const [news, settings] = await Promise.all([getPublishedBySlug(slug), getSiteSettings()]);
 
   if (!news) notFound();
 
+  // Estas sí: hay que saber de qué sección es la nota para poder recomendar
+  // dentro de ella, y cuál es para no recomendarse a sí misma.
+  const recommendations = await getInlineRecommendations(
+    { id: news.id, categoryId: news.category?.id ?? null },
+    { count: settings.inline_recos_count, source: settings.inline_recos_source },
+  );
+
   // El nombre del autor sale ahora junto al avatar, no dentro de esta línea.
-  const meta = [
-    formatPublishedAt(news.published_at),
-    news.read_minutes ? `${news.read_minutes} min de lectura` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const readingTime = news.read_minutes ? `${news.read_minutes} min de lectura` : null;
+
+  const url = absoluteUrl(`/noticias/${news.slug}`);
+
+  /*
+    Lo que hace que Google entienda esto como una nota y no como una página
+    cualquiera: sin `NewsArticle` con fecha, autor y editor, la nota no entra al
+    carrusel de Noticias ni muestra la firma en los resultados.
+
+    Las imágenes van todas las que tenga (portada y galería) porque Google elige
+    la que mejor le cuadra al formato en el que va a mostrar el resultado.
+  */
+  const images = [
+    ...new Set(
+      [news.cover_image_url, ...news.images.map((image) => image.url)].filter(
+        (image): image is string => Boolean(image),
+      ),
+    ),
+  ];
+
+  const articleJsonLd = {
+    "@type": "NewsArticle",
+    "@id": `${url}#article`,
+    mainEntityOfPage: url,
+    url,
+    headline: news.title,
+    description: news.excerpt ?? undefined,
+    image: images.length ? images : undefined,
+    datePublished: news.published_at ?? news.created_at,
+    dateModified: news.updated_at,
+    author: news.author_name
+      ? [{ "@type": "Person", name: news.author_name }]
+      : [{ "@type": "Organization", name: "Kort", "@id": `${SITE_URL}/#organization` }],
+    publisher: organizationJsonLd,
+    articleSection: news.category?.name,
+    inLanguage: "es-MX",
+    isAccessibleForFree: true,
+  };
+
+  const breadcrumb = breadcrumbJsonLd([
+    { name: "Inicio", path: "/" },
+    ...(news.category
+      ? [{ name: news.category.name, path: `/categoria/${news.category.slug}` }]
+      : []),
+    { name: news.title, path: `/noticias/${news.slug}` },
+  ]);
 
   return (
     <>
+      <JsonLd data={articleJsonLd} />
+      <JsonLd data={breadcrumb} />
+
       <SiteHeader />
 
       {/* Mide el <main>: la lectura empieza en el titular, no en el masthead. */}
@@ -84,33 +166,51 @@ export default async function NoticiaPage(props: PageProps<"/noticias/[slug]">) 
           </Link>
         )}
 
-        <h1 className="mt-4 text-4xl font-extrabold leading-tight">{news.title}</h1>
+        <h1 className="mt-4 text-4xl font-extrabold leading-tight">{punct(news.title)}</h1>
 
-        {news.excerpt && <p className="mt-4 text-lg text-muted">{news.excerpt}</p>}
+        {news.excerpt && <p className="mt-4 text-lg text-muted">{punct(news.excerpt)}</p>}
 
         <div className="mt-6 flex items-center gap-3 border-t border-border py-4">
           <AuthorAvatar name={news.author_name} url={news.author_avatar_url} />
           <div>
             {news.author_name && <p className="text-sm font-bold">{news.author_name}</p>}
-            <p className="text-[13px] font-semibold text-muted">{meta}</p>
+            {/* `<time>` con la fecha en ISO: el texto de arriba está en
+                español y con mes en letra, que un rastreador no puede parsear.
+                El atributo sí. */}
+            <p className="text-[13px] font-semibold text-muted">
+              {news.published_at && (
+                <time dateTime={news.published_at}>
+                  {formatPublishedAt(news.published_at)}
+                </time>
+              )}
+              {news.published_at && readingTime ? " · " : null}
+              {readingTime}
+            </p>
           </div>
         </div>
 
         <div className="border-b border-border">
-          <ShareButtons url={absoluteUrl(`/noticias/${news.slug}`)} title={news.title} />
+          <ShareButtons url={url} title={news.title} />
         </div>
+
+        <AdSlot zone="article-top" className="mt-8" />
 
         <NewsGallery images={news.images} />
 
         {/*
           `content_html` lo genera Tiptap a partir de lo que escribió un admin.
-          La clase kort-prose es la que le devuelve el formato con el que se
+          `ArticleBody` lo parte por frontera de bloque para colar las notas
+          recomendadas entre párrafo y párrafo, y le pone la clase kort-prose a
+          cada trozo — que es la que le devuelve el formato con el que se
           escribió (encabezados, listas, colores, resaltados).
         */}
-        <div
-          className="kort-prose mt-8"
-          dangerouslySetInnerHTML={{ __html: news.content_html ?? "" }}
+        <ArticleBody
+          html={news.content_html}
+          recommendations={recommendations}
+          label={settings.inline_recos_label}
         />
+
+        <AdSlot zone="article-bottom" className="mt-10" />
       </main>
 
       <BackToTop />

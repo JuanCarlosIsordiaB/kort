@@ -58,7 +58,7 @@ app/
   admin/
     login/       fuera del layout protegido, si no rebotaría contra sí mismo
     (panel)/     layout protegido + dashboard, secciones y editor
-  api/           auth · noticias · categorias · upload
+  api/           auth · noticias · categorias · anuncios · upload
 lib/
   auth/          jwt, cookie de sesión y requireAdmin()
   data/          TODAS las consultas a la base viven aquí
@@ -106,6 +106,36 @@ Dos detalles no obvios ahí: **satori solo decodifica PNG y JPEG**, y ocho de nu
 > En desarrollo `og:image` sale apuntando a `localhost` aunque `metadataBase` diga otra cosa: Next lo fuerza a propósito (ver `getSocialImageMetadataBaseFallback` en `next/dist/lib/metadata/resolvers/resolve-url.js`). En producción usa `metadataBase`. La vista previa real solo se puede comprobar tras desplegar.
 
 **Ayudas de lectura.** Barra vertical de avance pegada al borde derecho y botón de volver arriba tras 800px. La barra mide el `<main>` de la nota, no la página completa: contando el masthead y el pie, arrancaría avanzada y llegaría al 100% antes del último párrafo.
+
+**Recomendaciones dentro del texto.** El cuerpo de la nota se parte para colar una o dos tarjetas con otra nota: una pasando el primer cuarto, otra ya entrado el último. La idea es que la visita no termine donde empezó.
+
+`lib/content-blocks.ts` corta el `content_html` por frontera de elemento de primer nivel —el único punto por donde se puede partir sin romper el marcado— y cada trozo se inyecta en su propio `.kort-prose`. No es un parser: es un contador de profundidad, y le alcanza porque la salida de Tiptap es una lista plana de bloques bien formados. La concatenación de los trozos es idéntica a la entrada, que es lo que permite volver a inyectarlos tal cual.
+
+**Cuántas tarjetas salen lo decide el largo del texto, no el ajuste.** Lo que se configura es un máximo: hacen falta 6 bloques para una y 10 para dos. Dos recomendaciones en un texto de cuatro párrafos se leen como un anuncio con texto alrededor. Los cortes se corren si caerían justo después de un encabezado —lo dejarían huérfano de su sección— y nunca caen en el primer ni en el último par de bloques.
+
+De dónde salen: manda lo que el admin haya elegido nota por nota (`news_recommendations`, misma forma que `home_slots` y por la misma razón: son ordenados y opcionales), y lo que falte se completa solo con lo más reciente publicado. Igual que la portada, curar es opcional.
+
+El comportamiento global se fija en **`/admin/portada`**: cuántas (0, 1 o 2), si el relleno automático prefiere la misma sección, y el rótulo de la tarjeta. Un pick manual que se despublique después no rompe nada — `getInlineRecommendations` lo salta y el relleno toma el hueco, que es la razón por la que la existencia del id no se valida al guardar.
+
+> Sin la migración aplicada el sitio no se cae: las consultas fallan, `data` viene `null` y todo cae al relleno automático. Lo que no funciona hasta migrar es guardar picks manuales.
+
+### Publicidad
+
+Campañas contratadas que se muestran como banner en huecos fijos, con su vigencia y su conteo de clics. Se administran en **`/admin/publicidad`**.
+
+**Las zonas las define el código, no el panel.** `lib/ad-zones.ts` tiene el catálogo —siete huecos, cada uno con su tamaño— y quien administra elige uno de un desplegable. La alternativa que suena más flexible, dejar "poner publicidad en cualquier parte", significa meter una imagen de medidas arbitrarias en una maqueta diseñada: se rompe sola y además no habría nada que vender por ubicación. Es el mismo modelo que `home_slots`.
+
+> Agregar una zona son **dos archivos**: la clave en `AD_ZONES` y el `check (zone in (...))` de `0006_ads.sql`. Tienen que decir lo mismo.
+
+**Cuando hay varias campañas vigentes en el mismo hueco se rota al azar**, para poder venderlo a más de un anunciante el mismo mes. El alcance real de ese "al azar" conviene tenerlo claro: la portada y las notas se cachean 5 minutos, así que dentro de esa ventana todos ven el mismo banner y la rotación ocurre por regeneración, no por visita. A lo largo de una campaña de semanas el reparto sale parejo igual, y a cambio el banner llega en el HTML —sin JavaScript de cliente, sin parpadeo y sin una petición por hueco.
+
+**El vencimiento no lo dispara nadie.** `getActiveAds` filtra por el día de hoy en `SITE_TIME_ZONE`, y la *policy de RLS filtra por lo mismo*. Esto último no es redundancia: la anon key viaja al navegador por diseño, y sin ese filtro en la policy cualquiera podría listar las campañas futuras y saber qué empresas contrataron y hasta cuándo. Eso es información comercial, no contenido. El panel lee con service role, así que sigue viendo las vencidas, las programadas y las pausadas, con su etiqueta.
+
+**El clic pasa por `/api/anuncios/[id]/click`**, que suma y redirige con **302**. Un 301 lo cachearía el navegador para siempre y el segundo clic del mismo visitante ya no se contaría. El destino sale de la base por id y no de la URL, para que esto no sea un redirector abierto; que sea `http`/`https` se valida al guardar, que es lo que impide almacenar un `javascript:` y renderizarlo como `href` en una página pública.
+
+Cada banner sale con el rótulo "PUBLICIDAD" y `rel="sponsored"`. En un sitio de noticias distinguir lo pagado de lo editorial es lo mínimo exigible, y `sponsored` es lo que Google espera de un enlace pagado.
+
+> Ojo con `app/noticias/[slug]/page.tsx`: para que una nota se cachee **hacen falta las dos exportaciones**, `revalidate` y `generateStaticParams` devolviendo `[]`. `revalidate` a secas no hace nada en una ruta con segmento dinámico. Antes de esto la nota se renderizaba entera en cada visita.
 
 ### Perfil del autor
 

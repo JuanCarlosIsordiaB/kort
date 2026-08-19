@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/admin/noticias/nueva", label: "Nueva noticia" },
   { href: "/admin/portada", label: "Portada" },
   { href: "/admin/categorias", label: "Secciones" },
+  { href: "/admin/publicidad", label: "Publicidad" },
   { href: "/admin/perfil", label: "Mi perfil" },
 ];
 

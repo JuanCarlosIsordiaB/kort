@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 
+import { FocusPicker } from "@/components/admin/FocusPicker";
 import { uploadImage } from "@/lib/upload-client";
 import type { NewsImageInput } from "@/lib/types";
 
@@ -23,6 +24,9 @@ export function ImageManager({
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  // Qué foto tiene abierto el encuadre. Solo una a la vez: abiertas todas, la
+  // lista se vuelve ilegible en cuanto hay más de dos o tres imágenes.
+  const [editingFocus, setEditingFocus] = useState<string | null>(null);
 
   const coverIndex = images.findIndex((image) => image.visible);
   const visibleCount = images.filter((image) => image.visible).length;
@@ -34,7 +38,13 @@ export function ImageManager({
     const added: NewsImageInput[] = [];
     for (const file of Array.from(files)) {
       try {
-        added.push({ url: await uploadImage(file), alt: null, visible: true });
+        added.push({
+          url: await uploadImage(file),
+          alt: null,
+          visible: true,
+          focus_x: 50,
+          focus_y: 50,
+        });
       } catch (e) {
         setError((e as Error).message);
       } finally {
@@ -95,73 +105,100 @@ export function ImageManager({
       {images.map((image, index) => (
         <div
           key={image.url}
-          className="flex items-start gap-3 rounded-[var(--radius-card)] border border-border p-3"
+          className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-border p-3"
         >
-          {/* Miniatura de una imagen ya subida a Supabase; <img> basta aquí. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={image.url}
-            alt=""
-            className={`h-16 w-20 shrink-0 rounded-[var(--radius-thumb)] object-cover sm:h-20 sm:w-28 ${
-              image.visible ? "" : "opacity-35 grayscale"
-            }`}
-          />
-
-          <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-1.5 text-xs font-bold">
-                <input
-                  type="checkbox"
-                  checked={image.visible}
-                  onChange={(e) => patch(index, { visible: e.target.checked })}
-                />
-                Visible
-              </label>
-
-              {index === coverIndex && (
-                <span className="rounded-[var(--radius-pill)] bg-accent px-2 py-0.5 text-[10px] font-extrabold tracking-wide text-accent-foreground">
-                  PORTADA
-                </span>
-              )}
-
-              <div className="ml-auto flex gap-1">
-                <button
-                  type="button"
-                  onClick={() => move(index, -1)}
-                  disabled={index === 0}
-                  title="Subir"
-                  aria-label="Subir"
-                  className="h-8 w-8 rounded border border-border text-xs disabled:opacity-30"
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  onClick={() => move(index, 1)}
-                  disabled={index === images.length - 1}
-                  title="Bajar"
-                  aria-label="Bajar"
-                  className="h-8 w-8 rounded border border-border text-xs disabled:opacity-30"
-                >
-                  ↓
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onChange(images.filter((_, i) => i !== index))}
-                  className="h-8 rounded border border-border px-2 text-xs text-orange"
-                >
-                  Quitar
-                </button>
-              </div>
-            </div>
-
-            <input
-              value={image.alt ?? ""}
-              onChange={(e) => patch(index, { alt: e.target.value })}
-              placeholder="Texto alternativo (describe la foto para quien no puede verla)"
-              className="w-full rounded-[var(--radius-thumb)] border border-border bg-input px-2 py-1 text-sm"
+          <div className="flex items-start gap-3">
+            {/* Miniatura de una imagen ya subida a Supabase; <img> basta aquí. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={image.url}
+              alt=""
+              style={{ objectPosition: `${image.focus_x}% ${image.focus_y}%` }}
+              className={`h-16 w-20 shrink-0 rounded-[var(--radius-thumb)] object-cover sm:h-20 sm:w-28 ${
+                image.visible ? "" : "opacity-35 grayscale"
+              }`}
             />
+
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-1.5 text-xs font-bold">
+                  <input
+                    type="checkbox"
+                    checked={image.visible}
+                    onChange={(e) => patch(index, { visible: e.target.checked })}
+                  />
+                  Visible
+                </label>
+
+                {index === coverIndex && (
+                  <span className="rounded-[var(--radius-pill)] bg-accent px-2 py-0.5 text-[10px] font-extrabold tracking-wide text-accent-foreground">
+                    PORTADA
+                  </span>
+                )}
+
+                <div className="ml-auto flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditingFocus((current) => (current === image.url ? null : image.url))
+                    }
+                    aria-expanded={editingFocus === image.url}
+                    title="Elegir qué parte de la foto no se recorta"
+                    className={`h-8 rounded border px-2 text-xs font-bold ${
+                      editingFocus === image.url
+                        ? "border-border-strong bg-chip"
+                        : "border-border"
+                    }`}
+                  >
+                    Encuadre
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => move(index, -1)}
+                    disabled={index === 0}
+                    title="Subir"
+                    aria-label="Subir"
+                    className="h-8 w-8 rounded border border-border text-xs disabled:opacity-30"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => move(index, 1)}
+                    disabled={index === images.length - 1}
+                    title="Bajar"
+                    aria-label="Bajar"
+                    className="h-8 w-8 rounded border border-border text-xs disabled:opacity-30"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onChange(images.filter((_, i) => i !== index))}
+                    className="h-8 rounded border border-border px-2 text-xs text-orange"
+                  >
+                    Quitar
+                  </button>
+                </div>
+              </div>
+
+              <input
+                value={image.alt ?? ""}
+                onChange={(e) => patch(index, { alt: e.target.value })}
+                placeholder="Texto alternativo (describe la foto para quien no puede verla)"
+                className="w-full rounded-[var(--radius-thumb)] border border-border bg-input px-2 py-1 text-sm"
+              />
+            </div>
           </div>
+
+          {editingFocus === image.url && (
+            <FocusPicker
+              url={image.url}
+              focusX={image.focus_x}
+              focusY={image.focus_y}
+              onChange={(focus) => patch(index, focus)}
+            />
+          )}
         </div>
       ))}
     </div>

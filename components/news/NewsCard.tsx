@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { coverFocusStyle } from "@/lib/image-focus";
+import { punct } from "@/lib/punctuation";
 import type { NewsWithCategory } from "@/lib/types";
 
 const dateFormat = new Intl.DateTimeFormat("es-MX", {
@@ -30,6 +32,7 @@ export function NewsCard({ news }: { news: NewsWithCategory }) {
             alt=""
             width={640}
             height={360}
+            style={coverFocusStyle(news)}
             className="h-40 w-full object-cover transition-transform duration-500 ease-soft group-hover:scale-[1.04]"
           />
         ) : (
@@ -48,10 +51,10 @@ export function NewsCard({ news }: { news: NewsWithCategory }) {
         )}
 
         <h3 className="text-base font-bold leading-snug">
-          <Link href={`/noticias/${news.slug}`}>{news.title}</Link>
+          <Link href={`/noticias/${news.slug}`}>{punct(news.title)}</Link>
         </h3>
 
-        {news.excerpt && <p className="text-sm text-muted">{news.excerpt}</p>}
+        {news.excerpt && <p className="text-sm text-muted">{punct(news.excerpt)}</p>}
 
         <p className="mt-auto pt-1 text-xs font-semibold text-muted">
           {[

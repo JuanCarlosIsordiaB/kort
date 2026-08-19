@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
 
+import { getSiteSettings } from "@/lib/data/home";
+import { SITE_DESCRIPTION } from "@/lib/seo";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 
@@ -18,26 +20,49 @@ export const metadata: Metadata = {
   // relativas: el enlace se comparte sin foto.
   metadataBase: new URL(SITE_URL),
   title: {
-    default: SITE_NAME,
+    default: `${SITE_NAME} — Noticias en corto`,
     template: `%s · ${SITE_NAME}`,
   },
-  description: "Noticias en corto.",
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
   openGraph: {
     siteName: SITE_NAME,
     locale: "es_MX",
     type: "website",
   },
   twitter: { card: "summary_large_image" },
+  // Por omisión Google recorta la miniatura a 90px de ancho en resultados y
+  // Discover, que para un sitio de noticias es la diferencia entre una foto y
+  // una estampilla. `max-image-preview:large` es lo que la deja grande, y va
+  // aquí para que valga en todo el sitio.
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // La puntuación en naranja se prende desde el panel y se ve en todo el sitio,
+  // así que el interruptor va aquí, en el <html>, y no bloque por bloque: los
+  // <span> que envuelven los signos (lib/punctuation.tsx) ya están siempre en el
+  // HTML y solo cambian de color cuando este atributo está presente.
+  const { punctuation_accent } = await getSiteSettings();
+
   return (
     // `suppressHydrationWarning` porque el script de abajo le pone `data-theme`
     // al <html> antes de que React hidrate: le dice a React que se quede con lo
     // que ya está en el DOM en vez de tratarlo como un error de hidratación.
     <html
-      lang="es"
+      lang="es-MX"
       className={`${manrope.variable} h-full antialiased`}
+      data-punct-accent={punctuation_accent ? "true" : undefined}
       suppressHydrationWarning
     >
       <head>

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { focusStyle } from "@/lib/image-focus";
 import type { NewsImage } from "@/lib/types";
 
 const INTERVAL_MS = 5000;
@@ -53,6 +54,7 @@ export function NewsGallery({ images }: { images: NewsImage[] }) {
         width={1280}
         height={720}
         priority
+        style={focusStyle(current.focus_x, current.focus_y)}
         className="mt-8 h-[380px] w-full rounded-[var(--radius-hero)] object-cover shadow-[var(--shadow-card)]"
       />
     );
@@ -86,6 +88,7 @@ export function NewsGallery({ images }: { images: NewsImage[] }) {
             sizes="(max-width: 768px) 100vw, 720px"
             priority={i === 0}
             aria-hidden={i !== index}
+            style={focusStyle(image.focus_x, image.focus_y)}
             className={`object-cover transition-opacity duration-500 ${
               i === index ? "opacity-100" : "opacity-0"
             }`}

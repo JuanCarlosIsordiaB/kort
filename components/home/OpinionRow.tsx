@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { initials, readShortUpper, upper } from "@/lib/format";
+import { punct } from "@/lib/punctuation";
 import type { NewsWithCategory } from "@/lib/types";
 
 export function OpinionRow({ items }: { items: NewsWithCategory[] }) {
@@ -40,7 +41,7 @@ export function OpinionRow({ items }: { items: NewsWithCategory[] }) {
             )}
 
             <div>
-              <div className="mb-2 text-base font-bold leading-snug">{item.title}</div>
+              <div className="mb-2 text-base font-bold leading-snug">{punct(item.title)}</div>
               <div className="text-[9px] font-extrabold tracking-[1.3px] text-muted">
                 {[upper(item.author_name), readShortUpper(item.read_minutes)]
                   .filter(Boolean)

@@ -5,7 +5,9 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const BUCKET = "news-images";
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
-const ALLOWED = ["image/jpeg", "image/png", "image/webp", "image/avif"];
+// El GIF entró por la publicidad: los banners animados son moneda corriente
+// y el anunciante los entrega así. Para las notas no cambia nada.
+const ALLOWED = ["image/jpeg", "image/png", "image/webp", "image/avif", "image/gif"];
 
 export async function POST(request: Request) {
   const admin = await requireAdmin();
@@ -20,7 +22,7 @@ export async function POST(request: Request) {
 
   if (!ALLOWED.includes(file.type)) {
     return Response.json(
-      { error: `Formato no permitido (${file.type || "desconocido"}). Usa JPG, PNG, WebP o AVIF.` },
+      { error: `Formato no permitido (${file.type || "desconocido"}). Usa JPG, PNG, WebP, AVIF o GIF.` },
       { status: 415 },
     );
   }

@@ -31,6 +31,9 @@ export interface News {
   /** HTML renderizado, para mostrar en público. */
   content_html: string | null;
   cover_image_url: string | null;
+  /** Encuadre de la portada, copiado de su imagen. Ver 0007_encuadre.sql. */
+  cover_focus_x: number;
+  cover_focus_y: number;
   category_id: string | null;
   status: NewsStatus;
   author_id: string | null;
@@ -53,6 +56,9 @@ export interface NewsImage {
   alt: string | null;
   position: number;
   visible: boolean;
+  /** Punto de la foto que nunca se recorta, en % (0-100). 50/50 es el centro. */
+  focus_x: number;
+  focus_y: number;
 }
 
 /** Lo que el panel manda al guardar: sin id, porque se reemplazan todas. */
@@ -60,6 +66,8 @@ export interface NewsImageInput {
   url: string;
   alt: string | null;
   visible: boolean;
+  focus_x: number;
+  focus_y: number;
 }
 
 /** Noticia con su categoría ya resuelta por el join. */
@@ -78,4 +86,30 @@ export interface Paginated<T> {
   total: number;
   page: number;
   pageCount: number;
+}
+
+/**
+ * Una campaña de publicidad. Refleja supabase/migrations/0006_ads.sql.
+ *
+ * `zone` es una de las claves de `AD_ZONES` (lib/ad-zones.ts); no se tipa como
+ * `AdZone` aquí para que este módulo siga siendo puro reflejo de la base.
+ */
+export interface Ad {
+  id: string;
+  /** Empresa que contrató el espacio. */
+  advertiser: string;
+  zone: string;
+  image_url: string;
+  target_url: string;
+  alt: string | null;
+  /** "YYYY-MM-DD", ambos inclusive. */
+  starts_on: string;
+  ends_on: string;
+  /** Pausa manual, independiente de las fechas. */
+  active: boolean;
+  click_count: number;
+  /** Notas internas del vendedor; nunca salen al público. */
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 }

@@ -1,5 +1,8 @@
 import Image from "next/image";
 
+/** Proporción real de los archivos (285 x 301), para reservar el hueco exacto. */
+const ASPECT = 285 / 301;
+
 /**
  * El logotipo. Son dos archivos, uno navy y uno ivory, y se elige por CSS según
  * el tema en vez de con estado de React: así el correcto ya está pintado antes
@@ -7,7 +10,7 @@ import Image from "next/image";
  */
 export function KortMark({ height = 52 }: { height?: number }) {
   const common = {
-    width: Math.round(height * 3.2),
+    width: Math.round(height * ASPECT),
     height,
     priority: true,
     style: { height, width: "auto" },

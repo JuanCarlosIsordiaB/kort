@@ -3,7 +3,12 @@ import { Suspense } from "react";
 
 import { LoginForm } from "./LoginForm";
 
-export const metadata: Metadata = { title: "Entrar al panel" };
+export const metadata: Metadata = {
+  title: "Entrar al panel",
+  // Fuera de los buscadores: una pantalla de acceso indexada no le sirve a
+  // nadie más que a quien busca la puerta.
+  robots: { index: false, follow: false },
+};
 
 export default function LoginPage() {
   return (

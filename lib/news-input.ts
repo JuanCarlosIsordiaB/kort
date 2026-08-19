@@ -1,4 +1,5 @@
 import type { NewsInput } from "@/lib/data/news";
+import { clampFocus } from "@/lib/image-focus";
 import type { NewsImageInput } from "@/lib/types";
 
 /**
@@ -33,10 +34,38 @@ export function parseNewsInput(body: unknown): NewsInput | { error: string } {
     content_html: typeof b.content_html === "string" ? b.content_html : null,
     category_id: typeof b.category_id === "string" && b.category_id ? b.category_id : null,
     images: images.images,
+    recommendations: parseRecommendations(b.recommendations),
   };
 }
 
+/**
+ * Ids de las notas recomendadas dentro del texto.
+ *
+ * Solo se limpia la forma (cadenas, sin repetidos, a lo más dos): que el id
+ * exista y esté publicado no se valida aquí a propósito. Una nota se puede
+ * despublicar después de haberla elegido, así que el momento de comprobarlo es
+ * al leer —`getInlineRecommendations` la salta y rellena el hueco— y no al
+ * guardar, donde solo lograría bloquear un guardado por algo ajeno.
+ */
+function parseRecommendations(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter((id): id is string => typeof id === "string" && id.length > 0)
+    .filter((id, i, all) => all.indexOf(id) === i)
+    .slice(0, MAX_RECOMMENDATIONS);
+}
+
 const MAX_IMAGES = 12;
+
+/**
+ * Cuántas notas puede recomendar una nota dentro de su propio texto.
+ *
+ * Vive aquí y no en `lib/data/news.ts` porque el formulario del panel también
+ * la necesita, y ese módulo arrastra el cliente de service role marcado con
+ * `server-only`: importarlo desde un Client Component revienta el build.
+ */
+export const MAX_RECOMMENDATIONS = 2;
 
 function parseImages(value: unknown): { images: NewsImageInput[] } | { error: string } {
   if (value === undefined || value === null) return { images: [] };
@@ -63,6 +92,10 @@ function parseImages(value: unknown): { images: NewsImageInput[] } | { error: st
       // `visible` por omisión es true: subir una foto y que no aparezca sería
       // lo contrario de lo que espera quien la acaba de subir.
       visible: image.visible !== false,
+      // Un encuadre ausente o absurdo cae al centro, que es lo que hacía el
+      // sitio antes de que existiera este campo.
+      focus_x: clampFocus(image.focus_x),
+      focus_y: clampFocus(image.focus_y),
     });
   }
 

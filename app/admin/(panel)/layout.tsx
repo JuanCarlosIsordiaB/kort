@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
@@ -8,6 +9,13 @@ import { getCurrentAdmin } from "@/lib/auth/session";
  * `/admin/login` vive fuera de este grupo de rutas a propósito: si estuviera
  * dentro, este layout lo protegería y el login rebotaría contra sí mismo.
  */
+/**
+ * El panel no es para lectores. `robots.txt` ya lo excluye del rastreo, pero
+ * eso no basta si alguien enlaza una ruta del panel desde fuera: la URL puede
+ * acabar en los resultados igual. Esta etiqueta es la que sí la saca.
+ */
+export const metadata: Metadata = { robots: { index: false, follow: false } };
+
 export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
   const admin = await getCurrentAdmin();
   if (!admin) redirect(LOGIN_PATH);

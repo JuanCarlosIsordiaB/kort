@@ -5,7 +5,15 @@ import { useState } from "react";
 
 import { ImageManager } from "@/components/admin/ImageManager";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
-import type { Category, News, NewsImage, NewsImageInput, NewsStatus } from "@/lib/types";
+import { MAX_RECOMMENDATIONS } from "@/lib/news-input";
+import type {
+  Category,
+  News,
+  NewsImage,
+  NewsImageInput,
+  NewsStatus,
+  NewsWithCategory,
+} from "@/lib/types";
 
 export interface NewsFormProps {
   categories: Category[];
@@ -13,9 +21,19 @@ export interface NewsFormProps {
   news?: News;
   /** Galería existente al editar, ya ordenada por posición. */
   images?: NewsImage[];
+  /** Las publicadas, para poder elegir a mano qué se recomienda en el texto. */
+  recommendable?: NewsWithCategory[];
+  /** Picks manuales existentes al editar, en orden. */
+  recommendations?: string[];
 }
 
-export function NewsForm({ categories, news, images: initialImages = [] }: NewsFormProps) {
+export function NewsForm({
+  categories,
+  news,
+  images: initialImages = [],
+  recommendable = [],
+  recommendations: initialRecommendations = [],
+}: NewsFormProps) {
   const router = useRouter();
 
   const [title, setTitle] = useState(news?.title ?? "");
@@ -27,6 +45,8 @@ export function NewsForm({ categories, news, images: initialImages = [] }: NewsF
       url: image.url,
       alt: image.alt,
       visible: image.visible,
+      focus_x: image.focus_x,
+      focus_y: image.focus_y,
     })),
   );
 
@@ -36,8 +56,24 @@ export function NewsForm({ categories, news, images: initialImages = [] }: NewsF
     html: news?.content_html ?? "",
   });
 
+  const [recommendations, setRecommendations] = useState<string[]>(initialRecommendations);
+
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  // Siempre un renglón vacío de más para poder agregar, y nunca más del tope.
+  const recommendationRows = [...recommendations, ""].slice(0, MAX_RECOMMENDATIONS);
+
+  function setRecommendation(index: number, id: string) {
+    setRecommendations((prev) => {
+      const next = [...prev];
+      if (id) next[index] = id;
+      else next.splice(index, 1);
+      // Compacta y sin repetidos: dos veces la misma nota daría dos tarjetas
+      // idénticas en el mismo artículo.
+      return next.filter((value, i, all) => value && all.indexOf(value) === i);
+    });
+  }
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -53,6 +89,7 @@ export function NewsForm({ categories, news, images: initialImages = [] }: NewsF
       category_id: categoryId || null,
       status,
       images,
+      recommendations,
     };
 
     try {
@@ -141,6 +178,40 @@ export function NewsForm({ categories, news, images: initialImages = [] }: NewsF
           </span>
         </span>
         <ImageManager images={images} onChange={setImages} />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <span className="text-xs font-bold uppercase tracking-wide text-muted">
+          Notas recomendadas dentro del texto{" "}
+          <span className="font-semibold normal-case">
+            — se intercalan entre los párrafos; vacío = las elige el sitio
+          </span>
+        </span>
+
+        {/* La nota se excluye de su propia lista: recomendarse a sí misma no
+            solo no sirve, la base lo rechaza con un CHECK. */}
+        {recommendationRows.map((id, index) => (
+          <select
+            key={`reco-${index}`}
+            value={id}
+            onChange={(e) => setRecommendation(index, e.target.value)}
+            className="w-full min-w-0 rounded-[var(--radius-thumb)] border border-border bg-input px-3 py-2 text-sm"
+          >
+            <option value="">
+              {index < recommendations.length
+                ? "— quitar —"
+                : "— automático (lo que diga Portada) —"}
+            </option>
+            {recommendable
+              .filter((n) => n.id !== news?.id)
+              .map((n) => (
+                <option key={n.id} value={n.id}>
+                  {n.category?.name ? `[${n.category.name}] ` : ""}
+                  {n.title}
+                </option>
+              ))}
+          </select>
+        ))}
       </div>
 
       <div className="flex flex-col gap-2">

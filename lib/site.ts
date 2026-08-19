@@ -28,3 +28,22 @@ export const SITE_TIME_ZONE = "America/Mexico_City";
 export function absoluteUrl(path: string): string {
   return `${SITE_URL}${path.startsWith("/") ? path : `/${path}`}`;
 }
+
+/**
+ * El día de hoy en la zona del sitio, como "YYYY-MM-DD".
+ *
+ * Vive aquí y no en `lib/news-filters.ts` porque la publicidad la necesita
+ * igual —las campañas se contratan por día— y no tiene nada que ver con el
+ * listado de noticias.
+ */
+export function todayInSiteZone(now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: SITE_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+
+  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}

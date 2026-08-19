@@ -2,6 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { readUpper, shortDateUpper, upper } from "@/lib/format";
+import { coverFocusStyle } from "@/lib/image-focus";
+import { punct, punctHtml } from "@/lib/punctuation";
 import type { NewsWithCategory } from "@/lib/types";
 
 /**
@@ -33,15 +35,15 @@ export function LeadPackage({
       {headlineHtml ? (
         <h1
           className="kort-headline mt-5 mb-4"
-          dangerouslySetInnerHTML={{ __html: headlineHtml }}
+          dangerouslySetInnerHTML={{ __html: punctHtml(headlineHtml) }}
         />
       ) : (
-        <h1 className="kort-headline mt-5 mb-4">{news.title}</h1>
+        <h1 className="kort-headline mt-5 mb-4">{punct(news.title)}</h1>
       )}
 
       {news.excerpt && (
         <p className="mb-4 max-w-[540px] text-base leading-relaxed text-muted">
-          {news.excerpt}
+          {punct(news.excerpt)}
         </p>
       )}
 
@@ -71,6 +73,7 @@ export function LeadPackage({
             width={1280}
             height={640}
             priority
+            style={coverFocusStyle(news)}
             className="h-[320px] w-full rounded-[var(--radius-hero)] object-cover shadow-[var(--shadow-card)]"
           />
         </Link>

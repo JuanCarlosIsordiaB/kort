@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import type { HomeSlot, SiteSettings } from "@/lib/data/home";
+import { punct } from "@/lib/punctuation";
 import type { NewsWithCategory } from "@/lib/types";
 
 const SLOT_INFO: Record<HomeSlot, { label: string; help: string; max: number }> = {
@@ -192,6 +193,96 @@ export function PortadaEditor({
         />
       </section>
 
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-extrabold uppercase tracking-wide">
+          Puntuación en naranja
+        </h2>
+        <p className="text-xs text-muted">
+          Pinta de naranja los puntos, comas y demás signos, y las letras
+          acentuadas, en los titulares, entradillas y el cuerpo de las notas. Se
+          aplica a todo el sitio.
+        </p>
+
+        <Toggle
+          checked={settings.punctuation_accent}
+          onChange={(v) => setSettings((s) => ({ ...s, punctuation_accent: v }))}
+          label="Signos y acentos en naranja"
+        />
+
+        {/* Muestra en vivo: el mismo `punct()` que usa el sitio, con el color
+            forzado por el estado local para que se vea antes de guardar. */}
+        <p
+          data-punct-accent={settings.punctuation_accent ? "true" : undefined}
+          className="rounded-[var(--radius-thumb)] border border-border bg-input px-3 py-2.5 text-base font-bold"
+        >
+          {punct("Se acabó la espera: la elección será en julio, sin más rodeos.")}
+        </p>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-sm font-extrabold uppercase tracking-wide">
+          Recomendaciones dentro de la nota
+        </h2>
+        <p className="text-xs text-muted">
+          Tarjetas con otra nota, intercaladas entre los párrafos: una pasando el primer
+          cuarto del texto y otra ya entrado el último. Aquí se fija el comportamiento
+          por omisión de todo el sitio; cada nota puede elegir a mano cuáles muestra
+          desde su propio formulario.
+        </p>
+
+        <label className="flex min-w-0 flex-col gap-1">
+          <span className="text-xs font-bold uppercase tracking-wide text-muted">
+            Cuántas
+          </span>
+          <select
+            value={String(settings.inline_recos_count)}
+            onChange={(e) =>
+              setSettings((s) => ({ ...s, inline_recos_count: Number(e.target.value) }))
+            }
+            className="w-full min-w-0 rounded-[var(--radius-thumb)] border border-border bg-input px-3 py-2 text-sm sm:max-w-xs"
+          >
+            <option value="0">Ninguna — apagado</option>
+            <option value="1">Una, a media nota</option>
+            <option value="2">Dos, al primer y al último cuarto</option>
+          </select>
+        </label>
+
+        {settings.inline_recos_count > 0 && (
+          <>
+            <label className="flex min-w-0 flex-col gap-1">
+              <span className="text-xs font-bold uppercase tracking-wide text-muted">
+                Qué se recomienda cuando la nota no lo elige
+              </span>
+              <select
+                value={settings.inline_recos_source}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    inline_recos_source: e.target.value as SiteSettings["inline_recos_source"],
+                  }))
+                }
+                className="w-full min-w-0 rounded-[var(--radius-thumb)] border border-border bg-input px-3 py-2 text-sm sm:max-w-xs"
+              >
+                <option value="latest">Lo más reciente publicado</option>
+                <option value="category">Lo más reciente de la misma sección</option>
+              </select>
+            </label>
+
+            <Field
+              label="Rótulo de la tarjeta"
+              value={settings.inline_recos_label}
+              onChange={(v) => setSettings((s) => ({ ...s, inline_recos_label: v }))}
+            />
+
+            <p className="text-xs text-muted">
+              Una nota corta lleva menos tarjetas de las que digas aquí, o ninguna: es un
+              máximo, no una cuota. Dos recomendaciones en un texto de cuatro párrafos se
+              leerían como un anuncio con texto alrededor.
+            </p>
+          </>
+        )}
+      </section>
+
       <section className="flex flex-col gap-4">
         <h2 className="text-sm font-extrabold uppercase tracking-wide">Textos del sitio</h2>
 
@@ -234,6 +325,48 @@ export function PortadaEditor({
         </a>
       </div>
     </div>
+  );
+}
+
+/**
+ * Interruptor de encendido/apagado.
+ *
+ * Es un <input type="checkbox"> de verdad —oculto con `sr-only`, no con
+ * `display:none`— con la pastilla dibujada al lado: así conserva el foco por
+ * teclado, la barra espaciadora y el nombre que lee un lector de pantalla, que
+ * es justo lo que se pierde al hacer el interruptor con un <div>.
+ */
+function Toggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  label: string;
+}) {
+  return (
+    <label className="flex w-fit cursor-pointer items-center gap-3">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="peer sr-only"
+      />
+      <span
+        aria-hidden
+        className={`flex h-6 w-11 shrink-0 items-center rounded-[var(--radius-pill)] border p-0.5 transition-colors duration-[var(--dur-fast)] ease-soft peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent ${
+          checked ? "border-orange bg-orange" : "border-border-strong bg-input"
+        }`}
+      >
+        <span
+          className={`h-4.5 w-4.5 rounded-full bg-background shadow-[var(--shadow-card)] transition-transform duration-[var(--dur-fast)] ease-soft ${
+            checked ? "translate-x-5" : "translate-x-0"
+          }`}
+        />
+      </span>
+      <span className="text-sm font-semibold">{label}</span>
+    </label>
   );
 }
 

@@ -122,7 +122,14 @@ function Card({
   news,
   cover,
 }: {
-  news: { title: string; excerpt: string | null; author_name: string | null; category: { name: string } | null };
+  news: {
+    title: string;
+    excerpt: string | null;
+    author_name: string | null;
+    category: { name: string } | null;
+    cover_focus_x: number;
+    cover_focus_y: number;
+  };
   cover: string | null;
 }) {
   const title = clamp(news.title, 95);
@@ -222,7 +229,14 @@ function Card({
             alt=""
             width={PHOTO_WIDTH}
             height={size.height}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              // La columna de la foto es angosta (42% de 1200), así que aquí es
+              // donde más se nota un encuadre mal elegido.
+              objectPosition: `${news.cover_focus_x}% ${news.cover_focus_y}%`,
+            }}
           />
         </div>
       )}

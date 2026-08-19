@@ -1,3 +1,5 @@
+import { punct } from "@/lib/punctuation";
+
 /**
  * Banda del boletín. El formulario todavía no tiene a dónde mandar los correos
  * —no hay tabla de suscriptores— así que en vez de fingir que funciona, el
@@ -15,7 +17,7 @@ export function NewsletterBand({ label, title }: { label: string; title: string 
           {label}
         </div>
         <p className="text-[26px] font-extrabold leading-tight tracking-[-0.5px] text-background">
-          {title}
+          {punct(title)}
         </p>
       </div>
 

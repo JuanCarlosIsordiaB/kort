@@ -299,6 +299,38 @@ body {
 }
 
 /*
+  ─────────────────────────────────────────────────────────────────────────────
+  Puntuación en naranja
+
+  `lib/punctuation.tsx` envuelve siempre los signos y las letras acentuadas del
+  texto editorial en `.kort-punct`. Sin la bandera del panel eso no se nota: el
+  span hereda la tinta y el texto se ve idéntico. El interruptor vive en el
+  <html> (`data-punct-accent`), así que prenderlo repinta el sitio entero sin
+  volver a renderizar nada.
+
+  `color: inherit` explícito para que un contenedor que ya cambia el color
+  —`text-muted` en las entradillas, el recuadro invertido del titular— siga
+  mandando cuando la bandera está apagada.
+  ─────────────────────────────────────────────────────────────────────────────
+*/
+.kort-punct {
+  color: inherit;
+}
+
+[data-punct-accent="true"] .kort-punct {
+  color: var(--orange);
+}
+
+/*
+  Dentro del recuadro invertido del titular el naranja queda sobre el navy y
+  pierde contraste, así que ahí la puntuación se queda con el color del propio
+  recuadro.
+*/
+[data-punct-accent="true"] .kort-headline mark .kort-punct {
+  color: inherit;
+}
+
+/*
   Estilos del HTML generado por Tiptap. El editor guarda HTML plano sin clases,
   así que el detalle de la noticia (y el propio editor) dependen de estas reglas
   para que lo escrito se vea igual que como se escribió.

@@ -1,3 +1,6 @@
+import type { RecoSource } from "@/lib/data/home";
+// Constante compartida con el panel; ver el comentario en su definición.
+import { MAX_RECOMMENDATIONS } from "@/lib/news-input";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabasePublic } from "@/lib/supabase/public";
 import { dayBoundaryInstant, NO_CATEGORY, type DateField } from "@/lib/news-filters";
@@ -20,11 +23,14 @@ export const PAGE_SIZE = 12;
  * listado público no tiene por qué cargar el JSON de Tiptap ni el `status`.
  */
 export const PUBLIC_COLUMNS =
-  "id, title, slug, excerpt, cover_image_url, author_name, author_avatar_url, read_minutes, view_count, published_at, category:categories(id, name, slug)";
+  "id, title, slug, excerpt, cover_image_url, cover_focus_x, cover_focus_y, author_name, author_avatar_url, read_minutes, view_count, published_at, category:categories(id, name, slug)";
 
 // El detalle sí trae la galería completa; los listados no la necesitan y sería
 // traer decenas de filas de más por página.
-const PUBLIC_DETAIL_COLUMNS = `${PUBLIC_COLUMNS}, content_html, images:news_images(id, news_id, url, alt, position, visible)`;
+// `created_at` y `updated_at` solo aquí: el detalle los publica como
+// `datePublished`/`dateModified` en los datos estructurados, y sin ellos Google
+// no sabe que una nota se corrigió. Los listados no los necesitan.
+const PUBLIC_DETAIL_COLUMNS = `${PUBLIC_COLUMNS}, content_html, created_at, updated_at, images:news_images(id, news_id, url, alt, position, visible, focus_x, focus_y)`;
 
 // ---------------------------------------------------------------------------
 // Lecturas públicas (anon key: RLS solo deja pasar status = 'published')
@@ -87,6 +93,128 @@ export async function getPublishedBySlug(slug: string): Promise<NewsWithImages |
       .filter((image) => image.visible)
       .sort((a, b) => a.position - b.position),
   };
+}
+
+/** Lo mínimo que el sitemap necesita de cada nota. */
+export interface SitemapEntry {
+  slug: string;
+  published_at: string | null;
+  updated_at: string;
+}
+
+/**
+ * Todas las notas publicadas, para `app/sitemap.ts`.
+ *
+ * No reusa `listPublished` porque el sitemap las quiere todas y esa está
+ * paginada de 12 en 12; y trae tres columnas en vez de las quince de
+ * `PUBLIC_COLUMNS` — el sitemap solo necesita la URL y su fecha.
+ *
+ * El tope de 5,000 es defensivo: el formato admite 50,000 URLs por archivo y
+ * hoy el archivo entero no llega ni cerca, pero sin `range` PostgREST corta en
+ * 1,000 en silencio y el sitemap se quedaría incompleto sin que nadie se entere.
+ */
+export async function listPublishedForSitemap(): Promise<SitemapEntry[]> {
+  const { data, error } = await supabasePublic()
+    .from("news")
+    .select("slug, published_at, updated_at")
+    .eq("status", "published")
+    .order("published_at", { ascending: false, nullsFirst: false })
+    .range(0, 4999);
+
+  if (error) throw new Error(`No se pudo armar el sitemap: ${error.message}`);
+  return (data ?? []) as SitemapEntry[];
+}
+
+/**
+ * Las notas que se pintan intercaladas en el cuerpo de esta.
+ *
+ * Manda lo que el admin haya elegido a mano; lo que falte se completa solo con
+ * lo más reciente publicado. Es el mismo trato que la portada: curar es
+ * opcional y una nota sin curar nunca se ve rota.
+ *
+ * Se descarta la nota misma y no se repite ninguna, incluso si el pick manual
+ * coincide con lo que habría salido por relleno.
+ */
+export async function getInlineRecommendations(
+  article: { id: string; categoryId: string | null },
+  options: { count: number; source: RecoSource },
+): Promise<NewsWithCategory[]> {
+  const count = Math.min(Math.max(options.count, 0), MAX_RECOMMENDATIONS);
+  if (count === 0) return [];
+
+  const supabase = supabasePublic();
+  const picked: NewsWithCategory[] = [];
+  // La nota entra ya "usada": nunca se recomienda a sí misma.
+  const seen = new Set<string>([article.id]);
+
+  const { data: manual } = await supabase
+    .from("news_recommendations")
+    .select("position, target_news_id")
+    .eq("news_id", article.id)
+    .order("position");
+
+  const manualIds = (manual ?? []).map((row) => row.target_news_id as string);
+
+  if (manualIds.length) {
+    const { data } = await supabase
+      .from("news")
+      .select(PUBLIC_COLUMNS)
+      .eq("status", "published")
+      .in("id", manualIds);
+
+    // Se reordena contra `manualIds` porque `in()` no conserva el orden pedido,
+    // y aquí el orden es justo lo que eligió el admin. Un pick que ya no exista
+    // o que se haya despublicado simplemente no aparece: el hueco lo toma el
+    // relleno de abajo.
+    const byId = new Map(
+      ((data ?? []) as unknown as NewsWithCategory[]).map((n) => [n.id, n]),
+    );
+
+    for (const id of manualIds) {
+      if (picked.length >= count) break;
+      const news = byId.get(id);
+      if (!news || seen.has(id)) continue;
+      seen.add(id);
+      picked.push(news);
+    }
+  }
+
+  if (picked.length >= count) return picked;
+
+  /**
+   * Con `source: "category"` se intenta primero la misma sección y luego el
+   * resto del sitio. Dos consultas en el peor caso, y solo cuando de verdad
+   * faltan tarjetas: una nota con sus dos picks a mano no lanza ninguna.
+   */
+  const attempts: (string | undefined)[] =
+    options.source === "category" && article.categoryId
+      ? [article.categoryId, undefined]
+      : [undefined];
+
+  for (const categoryId of attempts) {
+    if (picked.length >= count) break;
+
+    let query = supabase
+      .from("news")
+      .select(PUBLIC_COLUMNS)
+      .eq("status", "published")
+      .order("published_at", { ascending: false, nullsFirst: false })
+      // Margen para descartar la nota misma y lo que ya se eligió a mano.
+      .limit(count + seen.size);
+
+    if (categoryId) query = query.eq("category_id", categoryId);
+
+    const { data } = await query;
+
+    for (const news of (data ?? []) as unknown as NewsWithCategory[]) {
+      if (picked.length >= count) break;
+      if (seen.has(news.id)) continue;
+      seen.add(news.id);
+      picked.push(news);
+    }
+  }
+
+  return picked;
 }
 
 // ---------------------------------------------------------------------------
@@ -193,11 +321,30 @@ export interface NewsInput {
   status: NewsStatus;
   /** Galería completa. Reemplaza lo que hubiera; el orden del arreglo manda. */
   images?: NewsImageInput[];
+  /**
+   * Ids de las notas recomendadas dentro del texto, en orden. Vacío no es un
+   * error: significa "elige tú", y el relleno automático hace el resto.
+   */
+  recommendations?: string[];
 }
 
-/** La portada dejó de escribirse a mano: es la primera imagen visible. */
-function coverFrom(images: NewsImageInput[] | undefined): string | null {
-  return images?.find((image) => image.visible)?.url ?? null;
+/**
+ * La portada dejó de escribirse a mano: es la primera imagen visible. Se
+ * resuelve una sola vez y de ella salen tanto la URL como el encuadre, para que
+ * no puedan quedar apuntando a fotos distintas.
+ */
+function coverImage(images: NewsImageInput[] | undefined): NewsImageInput | null {
+  return images?.find((image) => image.visible) ?? null;
+}
+
+/** Columnas de portada desnormalizadas en `news`. Ver 0007_encuadre.sql. */
+function coverColumns(images: NewsImageInput[] | undefined) {
+  const cover = coverImage(images);
+  return {
+    cover_image_url: cover?.url ?? null,
+    cover_focus_x: cover?.focus_x ?? 50,
+    cover_focus_y: cover?.focus_y ?? 50,
+  };
 }
 
 /**
@@ -222,10 +369,58 @@ async function replaceImages(newsId: string, images: NewsImageInput[] = []): Pro
     alt: image.alt?.trim() || null,
     position: i + 1,
     visible: image.visible,
+    focus_x: image.focus_x,
+    focus_y: image.focus_y,
   }));
 
   const { error } = await supabase.from("news_images").insert(rows);
   if (error) throw new Error(error.message);
+}
+
+/**
+ * Reemplaza los picks manuales de una nota. Mismo criterio que la galería y que
+ * la portada: borrar e insertar, porque son a lo más dos renglones y así el
+ * orden guardado es exactamente el que mandó el panel.
+ */
+async function replaceRecommendations(
+  newsId: string,
+  ids: string[] = [],
+): Promise<void> {
+  const supabase = supabaseAdmin();
+
+  const { error: deleteError } = await supabase
+    .from("news_recommendations")
+    .delete()
+    .eq("news_id", newsId);
+  if (deleteError) throw new Error(deleteError.message);
+
+  const clean = ids
+    .filter((id) => id && id !== newsId)
+    .filter((id, i, all) => all.indexOf(id) === i)
+    .slice(0, MAX_RECOMMENDATIONS);
+
+  if (!clean.length) return;
+
+  const { error } = await supabase.from("news_recommendations").insert(
+    clean.map((target_news_id, i) => ({
+      news_id: newsId,
+      position: i + 1,
+      target_news_id,
+    })),
+  );
+  if (error) throw new Error(error.message);
+}
+
+/** Los picks manuales tal cual están guardados, para el formulario del panel. */
+export async function getRecommendationIdsFor(newsId: string): Promise<string[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("news_recommendations")
+    .select("position, target_news_id")
+    .eq("news_id", newsId)
+    .order("position");
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => row.target_news_id as string);
 }
 
 export async function getImagesFor(newsId: string): Promise<NewsImage[]> {
@@ -253,7 +448,7 @@ export async function createNews(
       excerpt: input.excerpt ?? null,
       content: input.content ?? null,
       content_html: input.content_html ?? null,
-      cover_image_url: coverFrom(input.images),
+      ...coverColumns(input.images),
       category_id: input.category_id ?? null,
       status: input.status,
       author_id: author.id,
@@ -270,6 +465,7 @@ export async function createNews(
 
   const news = data as News;
   await replaceImages(news.id, input.images);
+  await replaceRecommendations(news.id, input.recommendations);
   return news;
 }
 
@@ -299,7 +495,7 @@ export async function updateNews(id: string, input: NewsInput): Promise<News> {
       excerpt: input.excerpt ?? null,
       content: input.content ?? null,
       content_html: input.content_html ?? null,
-      cover_image_url: coverFrom(input.images),
+      ...coverColumns(input.images),
       category_id: input.category_id ?? null,
       status: input.status,
       read_minutes: readMinutes(input.content_html),
@@ -312,6 +508,7 @@ export async function updateNews(id: string, input: NewsInput): Promise<News> {
   if (error) throw new Error(error.message);
 
   await replaceImages(id, input.images);
+  await replaceRecommendations(id, input.recommendations);
   return data as News;
 }
 

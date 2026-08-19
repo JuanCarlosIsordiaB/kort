@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { timeAgoUpper, upper } from "@/lib/format";
+import { coverFocusStyle } from "@/lib/image-focus";
+import { punct } from "@/lib/punctuation";
 import type { NewsWithCategory } from "@/lib/types";
 
 /**
@@ -54,6 +56,7 @@ export function SidebarTabs({
                   alt=""
                   width={124}
                   height={124}
+                  style={coverFocusStyle(item)}
                   className="h-[62px] w-[62px] shrink-0 rounded-[var(--radius-thumb)] object-cover"
                 />
               ) : (
@@ -66,7 +69,7 @@ export function SidebarTabs({
                   <span aria-hidden className="h-[3px] w-[3px] rounded-full bg-current" />
                   <span className="whitespace-nowrap">{timeAgoUpper(item.published_at)}</span>
                 </div>
-                <div className="text-sm font-bold leading-snug">{item.title}</div>
+                <div className="text-sm font-bold leading-snug">{punct(item.title)}</div>
               </div>
             </Link>
           ))

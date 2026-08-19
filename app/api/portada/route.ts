@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireAdmin } from "@/lib/auth/session";
 import { getHomeSlots, getSiteSettings, type HomeSlot } from "@/lib/data/home";
+import { MAX_RECOMMENDATIONS } from "@/lib/news-input";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const SLOTS: HomeSlot[] = ["lead", "breaking", "featured", "opinion"];
@@ -11,6 +12,13 @@ const MAX_PER_SLOT: Record<HomeSlot, number> = {
   featured: 3,
   opinion: 2,
 };
+
+/** 0, 1 o 2 tarjetas dentro del texto; cualquier otra cosa deja lo que había. */
+function clampCount(value: unknown, fallback: number): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(Math.max(Math.trunc(n), 0), MAX_RECOMMENDATIONS);
+}
 
 export async function GET() {
   const admin = await requireAdmin();
@@ -87,6 +95,18 @@ export async function PUT(request: Request) {
         newsletter_title: text(s.newsletter_title, current.newsletter_title),
         newsletter_label: text(s.newsletter_label, current.newsletter_label),
         footer_tagline: text(s.footer_tagline, current.footer_tagline),
+        punctuation_accent:
+          typeof s.punctuation_accent === "boolean"
+            ? s.punctuation_accent
+            : current.punctuation_accent,
+        // Las columnas llevan CHECK, así que un valor fuera de rango sería un
+        // 500 en vez de un guardado silenciosamente raro. Se recorta aquí.
+        inline_recos_count: clampCount(s.inline_recos_count, current.inline_recos_count),
+        inline_recos_source:
+          s.inline_recos_source === "category" || s.inline_recos_source === "latest"
+            ? s.inline_recos_source
+            : current.inline_recos_source,
+        inline_recos_label: text(s.inline_recos_label, current.inline_recos_label),
       })
       .eq("id", true);
 
@@ -95,7 +115,12 @@ export async function PUT(request: Request) {
 
   // La portada es una ruta con ISR: sin esto el cambio no se vería hasta que
   // venciera la ventana de revalidación.
-  revalidatePath("/");
+  //
+  // Con `"layout"` en vez de la ruta sola porque el layout raíz también lee
+  // `site_settings` (la puntuación en naranja), y esa bandera se ve en todo el
+  // sitio: revalidar solo "/" dejaría las notas y el archivo con el ajuste
+  // anterior hasta que a cada una le tocara regenerarse.
+  revalidatePath("/", "layout");
 
   return Response.json({ ok: true });
 }
