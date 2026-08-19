@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
 
+import { InlineScript } from "@/components/site/InlineScript";
 import { getSiteSettings } from "@/lib/data/home";
 import { SITE_DESCRIPTION } from "@/lib/seo";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
@@ -68,7 +69,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         {/* Debe ir en <head> y ser síncrono: si corriera después, el usuario
             alcanzaría a ver un destello con el tema equivocado. */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <InlineScript html={THEME_INIT_SCRIPT} />
       </head>
       {/*
         `suppressHydrationWarning` aquí es por las extensiones del navegador, no
