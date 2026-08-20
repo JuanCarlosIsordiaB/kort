@@ -23,15 +23,12 @@ import { absoluteUrl, SITE_NAME } from "@/lib/site";
  * nombre, su foto y sus notas publicadas—: el correo, el rol y los borradores
  * son cosa del panel, y esta página no los pide (ver `lib/data/reporters.ts`).
  *
- * Cacheada e ISR como la nota: ver el comentario largo en
- * `app/noticias/[slug]/page.tsx` sobre por qué hacen falta las dos
- * exportaciones en una ruta con segmento dinámico.
+ * Dinámica, no ISR, igual que `/categoria/[slug]`: el listado se pagina con
+ * `?page=`, y `searchParams` es una API de request-time. Declarar `revalidate`
+ * y `generateStaticParams` la marcaba como SSG, y entonces leer `searchParams`
+ * al generarla reventaba con `DYNAMIC_SERVER_USAGE` — un 500 que solo aparece
+ * en producción, porque en `next dev` todo se renderiza en cada petición.
  */
-export const revalidate = 300;
-
-export function generateStaticParams() {
-  return [];
-}
 
 /** El número de página del listado, tolerante a `?page=abc` y a `?page=-3`. */
 function pageNumber(value: string | string[] | undefined): number {

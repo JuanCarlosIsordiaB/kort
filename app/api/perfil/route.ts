@@ -89,9 +89,8 @@ export async function PUT(request: Request) {
   }
 
   revalidatePath("/"); // la fila de Opinión de la portada muestra el avatar
-  // La página del reportero es ISR de cinco minutos: sin esto, quien acaba de
-  // agregar sus redes no las vería y creería que no se guardaron.
-  revalidatePath("/reportero/[slug]", "page");
+  // La página del autor no hace falta revalidarla: se renderiza en cada
+  // petición, así que las redes recién guardadas salen en la siguiente carga.
   // Y la de Opinión: el nombre de su columna encabeza cada una de sus tarjetas.
   revalidateOpinion();
 
