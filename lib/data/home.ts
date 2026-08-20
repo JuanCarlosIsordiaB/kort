@@ -1,6 +1,7 @@
+import { listCategories } from "@/lib/data/categories";
 import { PUBLIC_COLUMNS } from "@/lib/data/news";
 import { supabasePublic } from "@/lib/supabase/public";
-import type { NewsWithCategory } from "@/lib/types";
+import type { Category, NewsImage, NewsWithCategory } from "@/lib/types";
 
 /**
  * Arma la portada.
@@ -36,13 +37,32 @@ export interface SiteSettings {
   inline_recos_label: string;
 }
 
+/**
+ * Un renglón de la portada: la sección y sus últimas notas.
+ *
+ * Reemplaza a la fila de chips sueltos. La sección sigue siendo un enlace, pero
+ * ahora arrastra su contenido en vez de obligar al lector a entrar para
+ * descubrir qué hay dentro.
+ */
+export interface CategoryRow {
+  category: Category;
+  items: NewsWithCategory[];
+}
+
 export interface HomeData {
   settings: SiteSettings;
   lead: NewsWithCategory | null;
+  /**
+   * La galería visible del lead, en orden. Es lo único que la portada trae de
+   * `news_images`: es la única foto grande de la página, y pedir la galería de
+   * las cuarenta notas del pool para enseñar miniaturas de 56px no se paga.
+   */
+  leadImages: NewsImage[];
   breaking: NewsWithCategory[];
   featured: NewsWithCategory[];
   opinion: NewsWithCategory[];
   grid: NewsWithCategory[];
+  categoryRows: CategoryRow[];
   /** Qué huecos vienen del panel; el resto es relleno automático. */
   curated: Record<HomeSlot, boolean>;
 }
@@ -55,6 +75,13 @@ const COLUMNS = PUBLIC_COLUMNS;
 const SIDEBAR_SIZE = 3;
 const OPINION_SIZE = 2;
 const GRID_SIZE = 4;
+/**
+ * Cuántas notas cuelgan de cada sección en los renglones de abajo.
+ *
+ * Va de la mano con las columnas del renglón en `CategoryRows`: cambiar este
+ * número sin cambiar la rejilla deja la fila coja o con un hueco al final.
+ */
+const CATEGORY_ROW_SIZE = 3;
 
 export async function getSiteSettings(): Promise<SiteSettings> {
   const { data } = await supabasePublic()
@@ -82,8 +109,9 @@ export async function getSiteSettings(): Promise<SiteSettings> {
 export async function getHomeData(): Promise<HomeData> {
   const supabase = supabasePublic();
 
-  const [settings, slotsResult, poolResult] = await Promise.all([
+  const [settings, categories, slotsResult, poolResult] = await Promise.all([
     getSiteSettings(),
+    listCategories(),
     supabase.from("home_slots").select("slot, position, news_id").order("position"),
     // Un solo tirón para todo lo que la portada puede necesitar: el lead, los
     // dos sidebars, la fila de opinión y la rejilla, con margen de sobra.
@@ -135,13 +163,29 @@ export async function getHomeData(): Promise<HomeData> {
   const [opinion, opinionCurated] = fill("opinion", OPINION_SIZE);
   const grid = take(GRID_SIZE);
 
+  // Va al final y no dentro del `Promise.all` de arriba porque necesita saber
+  // qué se pintó arriba. Solo se descartan el lead y la rejilla: son los dos
+  // bloques grandes, los que el lector no puede no haber visto. Las del sidebar
+  // sí se repiten aquí a propósito — es una lista lateral y chica, y excluirla
+  // vaciaba los renglones justo cuando el sitio tiene pocas notas, que es
+  // cuando más falta hace llenar la portada.
+  const aboveIds = new Set([...leadList, ...grid].map((news) => news.id));
+  const lead = leadList[0] ?? null;
+
+  const [categoryRows, leadImages] = await Promise.all([
+    categoryRowsFor(supabase, categories, aboveIds),
+    lead ? galleryFor(supabase, lead.id) : Promise.resolve([]),
+  ]);
+
   return {
     settings,
-    lead: leadList[0] ?? null,
+    lead,
+    leadImages,
     breaking,
     featured,
     opinion,
     grid,
+    categoryRows,
     curated: {
       lead: leadCurated,
       breaking: breakingCurated,
@@ -149,6 +193,64 @@ export async function getHomeData(): Promise<HomeData> {
       opinion: opinionCurated,
     },
   };
+}
+
+/**
+ * Las fotos visibles de una nota, en el orden que fijó el panel.
+ *
+ * Se ordena y se filtra en la consulta, no en memoria: aquí solo se pide una
+ * nota, así que el filtro puede vivir en la base en vez de traer las ocultas
+ * para tirarlas después.
+ */
+async function galleryFor(
+  supabase: ReturnType<typeof supabasePublic>,
+  newsId: string,
+): Promise<NewsImage[]> {
+  const { data } = await supabase
+    .from("news_images")
+    .select("id, news_id, url, alt, position, visible, focus_x, focus_y")
+    .eq("news_id", newsId)
+    .eq("visible", true)
+    .order("position");
+
+  return (data ?? []) as NewsImage[];
+}
+
+/**
+ * Las últimas notas de cada sección, saltándose las que ya salieron arriba.
+ *
+ * Una consulta por sección en vez de agrupar el pool: el pool son las 40 más
+ * recientes del sitio y una sección que publica poco no aparecería ahí, así que
+ * agrupar dejaría renglones vacíos justo en las secciones que más necesitan que
+ * se les vea. Se piden `exclude.size` de más para que descartar las repetidas
+ * no deje el renglón corto.
+ */
+async function categoryRowsFor(
+  supabase: ReturnType<typeof supabasePublic>,
+  categories: Category[],
+  exclude: Set<string>,
+): Promise<CategoryRow[]> {
+  const rows = await Promise.all(
+    categories.map(async (category) => {
+      const { data } = await supabase
+        .from("news")
+        .select(COLUMNS)
+        .eq("status", "published")
+        .eq("category_id", category.id)
+        .order("published_at", { ascending: false, nullsFirst: false })
+        .limit(CATEGORY_ROW_SIZE + exclude.size);
+
+      const items = ((data ?? []) as unknown as NewsWithCategory[])
+        .filter((news) => !exclude.has(news.id))
+        .slice(0, CATEGORY_ROW_SIZE);
+
+      return { category, items };
+    }),
+  );
+
+  // Una sección recién creada, o cuya única nota ya salió arriba, no pinta un
+  // renglón vacío: desaparece hasta que tenga algo que mostrar.
+  return rows.filter((row) => row.items.length > 0);
 }
 
 /** Lo que ve el panel: los huecos tal cual están guardados. */

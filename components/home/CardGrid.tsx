@@ -4,7 +4,7 @@ import Link from "next/link";
 import { readShortUpper, timeAgoUpper, upper } from "@/lib/format";
 import { coverFocusStyle } from "@/lib/image-focus";
 import { punct } from "@/lib/punctuation";
-import type { Category, NewsWithCategory } from "@/lib/types";
+import type { NewsWithCategory } from "@/lib/types";
 
 /** La barra "AHORA EN KORT" que separa el lead de la rejilla. */
 export function NowBar() {
@@ -19,24 +19,6 @@ export function NowBar() {
       >
         TENDENCIAS AHORA →
       </Link>
-    </div>
-  );
-}
-
-export function CategoryRail({ categories }: { categories: Category[] }) {
-  if (!categories.length) return null;
-
-  return (
-    <div className="mb-7 flex flex-wrap gap-2.5">
-      {categories.map((category) => (
-        <Link
-          key={category.id}
-          href={`/categoria/${category.slug}`}
-          className="rounded-[var(--radius-pill)] border border-border-strong px-4 py-2.5 text-[11px] font-extrabold tracking-[1.2px] transition-colors hover:border-foreground hover:bg-foreground hover:text-background"
-        >
-          {upper(category.name)}
-        </Link>
-      ))}
     </div>
   );
 }

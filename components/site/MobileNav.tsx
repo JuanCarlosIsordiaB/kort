@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import { categoryPath } from "@/lib/category-path";
 import { upper } from "@/lib/format";
 import type { Category } from "@/lib/types";
 
@@ -80,7 +81,7 @@ export function MobileNav({ categories }: { categories: Category[] }) {
             {categories.map((category) => (
               <Link
                 key={category.id}
-                href={`/categoria/${category.slug}`}
+                href={categoryPath(category)}
                 onClick={() => setOpen(false)}
                 className="border-b border-border py-3.5 text-xs font-bold tracking-[1.4px] text-muted transition-colors hover:text-foreground"
               >

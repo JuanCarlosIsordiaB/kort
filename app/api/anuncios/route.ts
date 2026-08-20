@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 
 import { parseAdInput } from "@/lib/ads-input";
-import { requireAdmin } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/session";
 import { createAd, listAds } from "@/lib/data/ads";
 
 /**
@@ -15,7 +15,7 @@ function revalidateEverywhere() {
 }
 
 export async function GET() {
-  const admin = await requireAdmin();
+  const admin = await requirePermission("publicidad");
   if (admin instanceof Response) return admin;
 
   try {
@@ -26,7 +26,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requirePermission("publicidad");
   if (admin instanceof Response) return admin;
 
   const parsed = parseAdInput(await request.json().catch(() => null));

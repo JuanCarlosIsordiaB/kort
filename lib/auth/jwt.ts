@@ -1,10 +1,23 @@
 import jwt from "jsonwebtoken";
 
 import { SESSION_MAX_AGE_SECONDS } from "./constants";
+import { isAdminRole, type AdminRole } from "./roles";
 
 export interface SessionPayload {
   adminId: string;
   email: string;
+  /**
+   * Copia del rol para que el proxy pueda rebotar sin consultar la base. Es una
+   * foto del momento del login: si a alguien se le cambia el rol, su token
+   * sigue diciendo lo viejo hasta que vuelva a entrar. Por eso nada que escriba
+   * se apoya en este campo — la palabra final la tiene el rol de la base, que
+   * `getCurrentAdmin()` vuelve a leer en cada request.
+   *
+   * Opcional porque los tokens emitidos antes de que existieran los roles no lo
+   * traen. Ausente significa "no sé": el proxy los deja pasar y la página, que
+   * sí consulta la base, decide.
+   */
+  role?: AdminRole;
 }
 
 function secret(): string {
@@ -38,8 +51,8 @@ export function verifySessionToken(
       typeof (decoded as SessionPayload).adminId === "string" &&
       typeof (decoded as SessionPayload).email === "string"
     ) {
-      const { adminId, email } = decoded as SessionPayload;
-      return { adminId, email };
+      const { adminId, email, role } = decoded as SessionPayload;
+      return isAdminRole(role) ? { adminId, email, role } : { adminId, email };
     }
     return null;
   } catch {

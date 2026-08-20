@@ -1,6 +1,14 @@
 /** Tipos de las filas de Supabase. Reflejan supabase/migrations/0001_init.sql. */
 
+import type { AdminRole } from "@/lib/auth/roles";
+
 export type NewsStatus = "draft" | "published";
+
+/**
+ * Qué clase de sección es. Solo puede haber una `opinion` —lo garantiza un
+ * índice parcial en 0010_opinion.sql— y es la que se lista en `/opinion`.
+ */
+export type CategoryKind = "noticia" | "opinion";
 
 export interface Admin {
   id: string;
@@ -8,6 +16,34 @@ export interface Admin {
   password_hash: string;
   display_name: string;
   avatar_url: string | null;
+  /** Qué puede tocar en el panel. Ver 0008_roles.sql y lib/auth/roles.ts. */
+  role: AdminRole;
+  /**
+   * Perfil público de columnista. Ver 0010_opinion.sql.
+   *
+   * Es ortogonal a `role`: un columnista puede ser `reportero` o `admin`. Esto
+   * no da permisos, decide cómo se le presenta al lector — su nombre encabeza
+   * la tarjeta y tiene página propia en `/opinion/[slug]`.
+   */
+  is_columnist: boolean;
+  /** El nombre permanente de su columna, ej. "Ecos de la Sierra". */
+  column_name: string | null;
+  /** Una línea que lo describe, bajo su nombre. */
+  tagline: string | null;
+  /** Semblanza, para la cabecera de su perfil. */
+  bio: string | null;
+  /**
+   * Las redes sociales, una columna por red. Ver 0011_redes.sql y el catálogo
+   * de `lib/social.ts`, que es lo que decide qué columna es cuál. Siempre
+   * guardan una URL completa ya validada, nunca un "@usuario".
+   */
+  x_url: string | null;
+  facebook_url: string | null;
+  instagram_url: string | null;
+  tiktok_url: string | null;
+  youtube_url: string | null;
+  linkedin_url: string | null;
+  website_url: string | null;
   created_at: string;
 }
 
@@ -18,6 +54,7 @@ export interface Category {
   id: string;
   name: string;
   slug: string;
+  kind: CategoryKind;
   created_at: string;
 }
 
@@ -86,6 +123,26 @@ export interface Paginated<T> {
   total: number;
   page: number;
   pageCount: number;
+}
+
+/**
+ * Un día de tráfico del sitio. Refleja supabase/migrations/0009_estadisticas.sql.
+ *
+ * `views` son páginas vistas (recargar cuenta otra vez) y `sessions` visitas:
+ * la primera página que abre un navegador en su sesión.
+ */
+export interface SiteViewDay {
+  /** "YYYY-MM-DD" en la zona del sitio. */
+  day: string;
+  views: number;
+  sessions: number;
+}
+
+/** Un día de lecturas de una nota. */
+export interface NewsViewDay {
+  news_id: string;
+  day: string;
+  views: number;
 }
 
 /**

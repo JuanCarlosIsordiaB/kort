@@ -47,3 +47,14 @@ export function todayInSiteZone(now: Date = new Date()): string {
   const part = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
+
+/**
+ * Correr un día "YYYY-MM-DD" hacia adelante o hacia atrás.
+ *
+ * Aritmética de calendario pura: UTC aquí es exacto porque no hay hora de por
+ * medio, y `Date.UTC` ya normaliza el desbordamiento de mes y de año.
+ */
+export function addDays(day: string, delta: number): string {
+  const [year, month, date] = day.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, date + delta)).toISOString().slice(0, 10);
+}

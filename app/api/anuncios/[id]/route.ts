@@ -1,11 +1,11 @@
 import { revalidatePath } from "next/cache";
 
 import { parseAdInput } from "@/lib/ads-input";
-import { requireAdmin } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/session";
 import { deleteAd, getAdById, updateAd } from "@/lib/data/ads";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/anuncios/[id]">) {
-  const admin = await requireAdmin();
+  const admin = await requirePermission("publicidad");
   if (admin instanceof Response) return admin;
 
   const { id } = await ctx.params;
@@ -20,7 +20,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/anuncios/[i
 }
 
 export async function PUT(request: Request, ctx: RouteContext<"/api/anuncios/[id]">) {
-  const admin = await requireAdmin();
+  const admin = await requirePermission("publicidad");
   if (admin instanceof Response) return admin;
 
   const { id } = await ctx.params;
@@ -39,7 +39,7 @@ export async function PUT(request: Request, ctx: RouteContext<"/api/anuncios/[id
 }
 
 export async function DELETE(_request: Request, ctx: RouteContext<"/api/anuncios/[id]">) {
-  const admin = await requireAdmin();
+  const admin = await requirePermission("publicidad");
   if (admin instanceof Response) return admin;
 
   const { id } = await ctx.params;

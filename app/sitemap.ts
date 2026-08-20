@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
 
-import { listCategories } from "@/lib/data/categories";
+import { getOpinionCategory, listCategories } from "@/lib/data/categories";
 import { listPublishedForSitemap } from "@/lib/data/news";
+import { listReportersWithNotes, profilePath } from "@/lib/data/reporters";
 import { absoluteUrl } from "@/lib/site";
 
 /**
@@ -13,7 +14,12 @@ import { absoluteUrl } from "@/lib/site";
 export const revalidate = 300;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [news, categories] = await Promise.all([listPublishedForSitemap(), listCategories()]);
+  const [news, categories, reporters, opinion] = await Promise.all([
+    listPublishedForSitemap(),
+    listCategories(),
+    listReportersWithNotes(),
+    getOpinionCategory(),
+  ]);
 
   // La fecha de la nota más reciente sirve de `lastmod` para los listados: es
   // lo que de verdad cambia en ellos.
@@ -33,11 +39,35 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "daily",
       priority: 0.6,
     },
-    ...categories.map((category) => ({
-      url: absoluteUrl(`/categoria/${category.slug}`),
+    // La sección de Opinión se queda fuera de `/categoria`: esa URL redirige a
+    // `/opinion`, y ofrecerle a Google una redirección en el sitemap es gastar
+    // presupuesto de rastreo en una página que no existe.
+    ...categories
+      .filter((category) => category.kind !== "opinion")
+      .map((category) => ({
+        url: absoluteUrl(`/categoria/${category.slug}`),
+        lastModified: listingsModified,
+        changeFrequency: "daily" as const,
+        priority: 0.7,
+      })),
+    ...(opinion
+      ? [
+          {
+            url: absoluteUrl("/opinion"),
+            lastModified: listingsModified,
+            changeFrequency: "daily" as const,
+            priority: 0.7,
+          },
+        ]
+      : []),
+    // La página de un autor cambia cuando publica, así que le sirve el mismo
+    // `lastmod` que a los listados: la fecha de lo último que salió. Cada quien
+    // aparece una sola vez, en la ruta a la que la otra redirige.
+    ...reporters.map((reporter) => ({
+      url: absoluteUrl(profilePath(reporter)),
       lastModified: listingsModified,
-      changeFrequency: "daily" as const,
-      priority: 0.7,
+      changeFrequency: "weekly" as const,
+      priority: 0.5,
     })),
     ...news.map((item) => ({
       url: absoluteUrl(`/noticias/${item.slug}`),

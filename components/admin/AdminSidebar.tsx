@@ -5,14 +5,21 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { ThemeToggle } from "@/components/site/ThemeToggle";
+import { can, ROLE_LABELS, type AdminRole, type Permission } from "@/lib/auth/roles";
 import { initials } from "@/lib/format";
 
-const LINKS = [
+/**
+ * `permission` ausente = lo ve cualquier cuenta del panel. Esconder el enlace
+ * es cortesía, no seguridad: la página y la API vuelven a comprobar el rol.
+ */
+const LINKS: { href: string; label: string; permission?: Permission }[] = [
   { href: "/admin", label: "Noticias" },
   { href: "/admin/noticias/nueva", label: "Nueva noticia" },
-  { href: "/admin/portada", label: "Portada" },
-  { href: "/admin/categorias", label: "Secciones" },
-  { href: "/admin/publicidad", label: "Publicidad" },
+  { href: "/admin/portada", label: "Portada", permission: "portada" },
+  { href: "/admin/categorias", label: "Secciones", permission: "secciones" },
+  { href: "/admin/publicidad", label: "Publicidad", permission: "publicidad" },
+  { href: "/admin/usuarios", label: "Usuarios", permission: "usuarios" },
+  { href: "/admin/estadisticas", label: "Estadísticas", permission: "estadisticas" },
   { href: "/admin/perfil", label: "Mi perfil" },
 ];
 
@@ -26,9 +33,11 @@ const LINKS = [
 export function AdminSidebar({
   adminName,
   avatarUrl,
+  role,
 }: {
   adminName: string;
   avatarUrl?: string | null;
+  role: AdminRole;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -100,6 +109,7 @@ export function AdminSidebar({
             <NavBody
               adminName={adminName}
               avatarUrl={avatarUrl}
+              role={role}
               pathname={pathname}
               onLogout={logout}
               onClose={() => setOpen(false)}
@@ -112,6 +122,7 @@ export function AdminSidebar({
         <NavBody
           adminName={adminName}
           avatarUrl={avatarUrl}
+          role={role}
           pathname={pathname}
           onLogout={logout}
         />
@@ -124,12 +135,14 @@ export function AdminSidebar({
 function NavBody({
   adminName,
   avatarUrl,
+  role,
   pathname,
   onLogout,
   onClose,
 }: {
   adminName: string;
   avatarUrl?: string | null;
+  role: AdminRole;
   pathname: string;
   onLogout: () => void;
   /**
@@ -163,7 +176,7 @@ function NavBody({
       </div>
 
       <nav className="flex flex-col gap-1">
-        {LINKS.map((link) => {
+        {LINKS.filter((link) => !link.permission || can(role, link.permission)).map((link) => {
           const active =
             link.href === "/admin" ? pathname === "/admin" : pathname.startsWith(link.href);
           return (
@@ -194,7 +207,12 @@ function NavBody({
               {initials(adminName)}
             </span>
           )}
-          <p className="min-w-0 truncate text-sm font-bold">{adminName}</p>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold">{adminName}</p>
+            <p className="truncate text-[11px] font-semibold text-muted">
+              {ROLE_LABELS[role]}
+            </p>
+          </div>
         </div>
         <button
           type="button"

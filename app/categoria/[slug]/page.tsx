@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { AdSlot } from "@/components/ads/AdSlot";
 import { NewsCard } from "@/components/news/NewsCard";
@@ -26,6 +26,13 @@ export async function generateMetadata(
 
   if (!category) return { title: "Sección no encontrada", robots: { index: false } };
 
+  // La página redirige (ver abajo); los metadatos de la que redirige no se
+  // llegan a usar, pero declararla `noindex` evita que un rastreador que solo
+  // mire la cabecera registre esta URL como una segunda copia de /opinion.
+  if (category.kind === "opinion") {
+    return { title: category.name, robots: { index: false } };
+  }
+
   const page = pageNumber(searchParams.page);
 
   // La canónica apunta a la página que se pidió, no siempre a la primera: si
@@ -48,6 +55,18 @@ export default async function CategoriaPage(props: PageProps<"/categoria/[slug]"
 
   const category = await getCategoryBySlug(slug);
   if (!category) notFound();
+
+  /*
+    Opinión no se pinta como una sección: tiene su propia página, con las
+    tarjetas de columnista. Se redirige en vez de renderizar aquí para que la
+    sección tenga una sola URL —dos listados idénticos se reparten el
+    posicionamiento en lugar de sumarlo—. La página viaja para no perderla al
+    saltar.
+  */
+  if (category.kind === "opinion") {
+    const page = pageNumber(searchParams.page);
+    redirect(page > 1 ? `/opinion?page=${page}` : "/opinion");
+  }
 
   const page = pageNumber(searchParams.page);
 

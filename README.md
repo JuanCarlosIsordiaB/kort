@@ -14,7 +14,7 @@ Ver [`PROJECT_SPEC.md`](./PROJECT_SPEC.md) para la especificación completa.
 npm install
 cp .env.local.example .env      # y llena los valores
 npm run db:migrate              # crea tablas, RLS y el bucket de Storage
-npm run seed:admin -- --email=tu@correo.com --password=... --name="Tu Nombre"
+npm run seed:admin -- --email=tu@correo.com --password=... --name="Tu Nombre"   # rol admin
 npm run dev
 ```
 
@@ -43,10 +43,64 @@ Van en `.env` o `.env.local` (los dos están en `.gitignore`).
 | `npm run typecheck`   | `tsc --noEmit`                                               |
 | `npm run lint`        | ESLint                                                       |
 | `npm run db:migrate`  | Aplica `supabase/migrations/*.sql` en orden, en transacción   |
-| `npm run seed:admin`  | Crea un admin (o le cambia la contraseña si el correo ya existe) |
+| `npm run seed:admin`  | Crea una cuenta del panel (o le cambia contraseña, nombre y rol si el correo ya existe) |
 | `npm run import:wix`  | Importa el blog de Wix (`--dry` para simular sin escribir)     |
 
-No hay registro público: los admins se dan de alta solo con `seed:admin`.
+No hay registro público: las cuentas se dan de alta solo con `seed:admin`.
+
+---
+
+## Roles
+
+Dos roles, en `admins.role` (ver `lib/auth/roles.ts`, que es la única tabla de
+permisos del proyecto).
+
+| | Administrador | Reportero |
+| --- | --- | --- |
+| Crear noticias | sí | sí |
+| Editar y borrar noticias | todas | **solo las suyas** |
+| Publicar (no solo guardar borrador) | sí | sí |
+| Portada | sí | no |
+| Secciones | sí | no |
+| Publicidad | sí | no |
+| Usuarios | sí | no |
+| Estadísticas | sí | no |
+| Mi perfil | sí | sí |
+
+El día a día se hace desde **Usuarios** (`/admin/usuarios`), que solo ven los
+administradores: dar de alta a alguien con su rol, cambiarle el nombre o el rol,
+resetearle la contraseña y eliminar la cuenta.
+
+Dos reglas que el panel no deja saltarse, y que juntas garantizan que nunca se
+quede sin administradores: nadie puede cambiarse su propio rol ni eliminar su
+propia cuenta. Quien manda la petición es administrador y no es el afectado, así
+que después de aplicarla siempre queda al menos uno en pie. Un administrador que
+quiera dejar de serlo se lo pide a otro.
+
+Eliminar una cuenta no borra lo que publicó: `news.author_id` es
+`on delete set null` y la byline vive desnormalizada en `news.author_name`, así
+que las notas siguen publicadas y firmadas con su nombre.
+
+`seed:admin` sigue existiendo para el arranque —cuando todavía no hay nadie que
+pueda entrar al panel— y como salida de emergencia si se pierde la contraseña
+del último administrador:
+
+```bash
+# alta de un reportero
+npm run seed:admin -- --email=reportero@kort.mx --password=... --name="Nombre" --role=reportero
+
+# subir a alguien a administrador (mismo comando, mismo correo)
+npm run seed:admin -- --email=reportero@kort.mx --password=... --name="Nombre" --role=admin
+```
+
+Sin `--role` la cuenta queda como `admin`, igual que antes de que existieran los
+roles. La migración `0008_roles.sql` también deja en `admin` a las cuentas que
+ya existían: una migración no le quita acceso a nadie por su cuenta.
+
+El rol viaja en el JWT solo para que el proxy pueda rebotar sin consultar la
+base. Nada que escriba se apoya en él: la palabra final la tiene el rol de la
+fila, que `getCurrentAdmin()` vuelve a leer en cada request. Por eso cambiarle
+el rol a alguien surte efecto de inmediato, sin esperar a que caduque su sesión.
 
 ---
 
@@ -87,9 +141,9 @@ app/
   admin/
     login/       fuera del layout protegido, si no rebotaría contra sí mismo
     (panel)/     layout protegido + dashboard, secciones y editor
-  api/           auth · noticias · categorias · anuncios · upload
+  api/           auth · noticias · categorias · anuncios · usuarios · vistas · upload
 lib/
-  auth/          jwt, cookie de sesión y requireAdmin()
+  auth/          jwt, cookie de sesión, roles/permisos y requireAdmin()
   data/          TODAS las consultas a la base viven aquí
   supabase/      cliente anon (lectura) y service role (escritura)
 components/      editor Tiptap, tarjetas de noticia, chrome del sitio
@@ -166,11 +220,41 @@ Cada banner sale con el rótulo "PUBLICIDAD" y `rel="sponsored"`. En un sitio de
 
 > Ojo con `app/noticias/[slug]/page.tsx`: para que una nota se cachee **hacen falta las dos exportaciones**, `revalidate` y `generateStaticParams` devolviendo `[]`. `revalidate` a secas no hace nada en una ruta con segmento dinámico. Antes de esto la nota se renderizaba entera en cada visita.
 
+### Estadísticas
+
+Cuánta gente entra al sitio y qué nota se lee. Se ven en **`/admin/estadisticas`**, solo administradores.
+
+**El conteo lo dispara el navegador, no el render.** Es la única forma correcta aquí: la portada y las notas se cachean 5 minutos, así que mil lectores dentro de esa ventana producen *un* render en el servidor. Contar ahí sería contar regeneraciones de caché. `ViewTracker` va montado en el layout raíz —cubre el sitio entero— y manda un `sendBeacon` a `POST /api/vistas` con la ruta y nada más.
+
+**El navegador nunca dice a qué nota sumarle.** Manda la ruta; la función `track_view` de la base traduce `/noticias/<slug>` a un id ella sola, y solo si la nota está publicada. Un borrador abierto con el enlace directo no es audiencia. Es el mismo criterio que el clic de un anuncio: el cliente no elige el objetivo.
+
+**Se guarda agregado por día, no una fila por visita.** `site_views` (día, páginas vistas, visitas) y `news_views` (nota, día, vistas). Una tabla de eventos crudos crece sin techo y obliga a un `group by` sobre cientos de miles de filas cada vez que alguien abre el panel; con el contador por día cada visita es un UPSERT sobre una fila que ya existe y el panel lee 30 filas para pintar un mes. Lo que se pierde es el detalle por visita (de dónde llegó, en qué orden navegó): si algún día hace falta un embudo, eso pide otra herramienta, no otra columna.
+
+La distinción que importa al leer los números: **visitas** son navegadores distintos (la primera página de una pestaña, marcada con `sessionStorage`) y **páginas vistas** son todas, recargas incluidas.
+
+`news.view_count` —la columna que existía desde `0001_init.sql` y que nadie escribía— ahora lleva el histórico de cada nota. Eso obligó a **acotar el trigger de `updated_at`**: sin la cláusula `when (old.view_count is not distinct from new.view_count)`, cada lectura movería la fecha de "actualizada" y el listado del panel —que ordena justo por ahí— pondría hasta arriba una nota vieja solo porque alguien la abrió.
+
+Las tablas **no tienen ninguna policy de RLS**: cuánto tráfico tiene el sitio es información del negocio, no contenido, y la anon key vive en el navegador de cualquiera. Se escriben desde el servidor y se leen con service role.
+
+**En desarrollo no se cuenta nada.** `next dev` apunta a la misma base que el sitio publicado, así que cada recarga mientras se programa acabaría sumada a los números de la redacción; `ViewTracker` sale temprano si `NODE_ENV` no es `production`. Para probar el conteo a mano, un `POST /api/vistas` con `{"path":"/noticias/<slug>"}` hace el mismo recorrido.
+
+> El endpoint es público y escribe, así que se trata como entrada hostil: la ruta se valida contra un patrón, se descartan los user-agents de bots y hay un tope de 60 vistas por minuto y por IP. El tope vive en memoria del proceso —best effort—: si algún día hace falta de verdad, el lugar correcto es el borde, no el route handler.
+
 ### Perfil del autor
 
 `admins.avatar_url` guarda la foto; `news.author_avatar_url` la copia en cada nota. Hace falta desnormalizar porque `admins` no es legible por anon.
 
 La asimetría es deliberada: **el nombre no se propaga y la foto sí**. Una byline firmada es un registro histórico y no debe cambiar porque el autor se renombre; una foto de perfil, en cambio, es la persona de hoy, así que `PUT /api/perfil` la reescribe en todo lo que ese autor haya firmado.
+
+#### Redes sociales
+
+Cada quien las captura en `/admin/perfil` y salen como enlaces en su página (`/reportero/[slug]`), debajo de su nombre. Siete redes, una columna por red en `admins` — tres venían de `0010_opinion.sql`, las otras cuatro de `0011_redes.sql`.
+
+El catálogo está en `lib/social.ts` y es lo único que hay que tocar para cambiar la lista: de ahí salen los campos del formulario, la validación del servidor y el orden en que se pintan.
+
+Se acepta lo que la gente sabe de memoria (`@fulano`) o lo que trae pegado del navegador (la URL completa), y en los dos casos **se guarda siempre la URL ya armada**, para que la página pública no tenga que saber construir el enlace de cada red. Lo que no se acepta: un `javascript:` —acabaría siendo un `href` en una página que abre cualquiera— ni una URL de otro dominio bajo la etiqueta de una red, que es lo que permitiría poner un enlace a otro sitio diciendo "Instagram". Eso se revisa al guardar (`parseSocials`) y otra vez al pintar (`socialList`), porque una fila editada a mano en el SQL editor nunca pasó por lo primero.
+
+Las URLs también van al JSON-LD como `sameAs`, que es lo que le dice a Google que la firma del sitio y esas cuentas son la misma persona.
 
 ### Tema claro/oscuro
 
@@ -203,7 +287,8 @@ Es idempotente por slug: volver a correrlo actualiza en vez de duplicar.
 ### Seguridad
 
 - RLS activo en las tres tablas. La anon key solo puede leer categorías y noticias `published`; `admins` es invisible y no hay ninguna policy de escritura.
-- El proxy es un chequeo *optimista* — solo evita el parpadeo de UI. La verificación real es `requireAdmin()`, que cada route handler protegido llama por su cuenta y que además confirma contra la base que el admin sigue existiendo.
+- El proxy es un chequeo *optimista* — solo evita el parpadeo de UI. La verificación real es `requireAdmin()` / `requirePermission()`, que cada route handler protegido llama por su cuenta y que además confirma contra la base que el admin sigue existiendo y con qué rol.
+- Esconder un enlace de la barra lateral es cortesía, no seguridad: cada página y cada endpoint que un reportero no puede tocar vuelve a comprobar el permiso, así que la URL escrita a mano devuelve un redirect o un 403.
 - `lib/supabase/admin.ts` está marcado con `server-only`: importarlo desde un Client Component falla en build en vez de filtrar el service role al navegador.
 
 ### Detalle pendiente
@@ -216,4 +301,4 @@ Es idempotente por slug: volver a correrlo actualiza en vez de duplicar.
 
 La maquetación fiel al handoff de diseño: home con lead package y rail "Más leídas", rejilla de categorías, fila de Opinión, vista de artículo completa, las 4 pantallas mobile con tab bar, la página de búsqueda y "Guardados".
 
-Los tokens de ambos temas ya están en `app/globals.css` y el esquema ya tiene las columnas que esas pantallas necesitan (`view_count`, `author_name`, `excerpt`, `read_minutes`), así que esa pasada es solo UI.
+Los tokens de ambos temas ya están en `app/globals.css` y el esquema ya tiene las columnas que esas pantallas necesitan (`author_name`, `excerpt`, `read_minutes`, y `view_count`, que desde las estadísticas ya viene con datos reales), así que esa pasada es solo UI.

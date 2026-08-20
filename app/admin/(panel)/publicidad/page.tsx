@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 import { adStatus, sortAdsForPanel } from "@/lib/ad-status";
+import { requirePanelPermission } from "@/lib/auth/session";
 import { listAds } from "@/lib/data/ads";
 import { todayInSiteZone } from "@/lib/site";
 
@@ -10,6 +11,8 @@ import { AdsManager } from "./AdsManager";
 export const metadata: Metadata = { title: "Publicidad" };
 
 export default async function PublicidadPage() {
+  await requirePanelPermission("publicidad");
+
   // El día se calcula aquí y viaja como prop: si cada fila lo sacara del reloj
   // del navegador, el HTML del servidor y el del cliente podrían no coincidir.
   const today = todayInSiteZone();

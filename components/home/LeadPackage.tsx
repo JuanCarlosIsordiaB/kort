@@ -1,10 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { LeadGallery } from "@/components/home/LeadGallery";
 import { readUpper, shortDateUpper, upper } from "@/lib/format";
 import { coverFocusStyle } from "@/lib/image-focus";
 import { punct, punctHtml } from "@/lib/punctuation";
-import type { NewsWithCategory } from "@/lib/types";
+import type { NewsImage, NewsWithCategory } from "@/lib/types";
 
 /**
  * El paquete principal de la portada: pill de sección, titular grande, extracto,
@@ -13,13 +14,19 @@ import type { NewsWithCategory } from "@/lib/types";
  * El titular puede venir de `headlineHtml` (escrito con Tiptap desde el panel,
  * donde la marca `highlight` produce el recuadro invertido del diseño). Si no
  * hay titular curado, se usa el título de la nota tal cual.
+ *
+ * `images` es la galería visible de la nota. Con dos o más, la foto se vuelve
+ * carrusel; con una sola —o con ninguna, cuando la nota es anterior a la
+ * galería— se pinta la portada tal cual, sin montar nada de slider.
  */
 export function LeadPackage({
   news,
   headlineHtml,
+  images = [],
 }: {
   news: NewsWithCategory;
   headlineHtml: string | null;
+  images?: NewsImage[];
 }) {
   return (
     <div className="border-border px-6 py-11 md:px-10 lg:border-r">
@@ -65,18 +72,22 @@ export function LeadPackage({
         LEER LA NOTA →
       </Link>
 
-      {news.cover_image_url && (
-        <Link href={`/noticias/${news.slug}`} className="block">
-          <Image
-            src={news.cover_image_url}
-            alt=""
-            width={1280}
-            height={640}
-            priority
-            style={coverFocusStyle(news)}
-            className="h-[320px] w-full rounded-[var(--radius-hero)] object-cover shadow-[var(--shadow-card)]"
-          />
-        </Link>
+      {images.length > 1 ? (
+        <LeadGallery images={images} href={`/noticias/${news.slug}`} />
+      ) : (
+        news.cover_image_url && (
+          <Link href={`/noticias/${news.slug}`} className="block">
+            <Image
+              src={news.cover_image_url}
+              alt=""
+              width={1280}
+              height={640}
+              priority
+              style={coverFocusStyle(news)}
+              className="h-[320px] w-full rounded-[var(--radius-hero)] object-cover shadow-[var(--shadow-card)]"
+            />
+          </Link>
+        )
       )}
     </div>
   );

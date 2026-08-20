@@ -1,4 +1,4 @@
-import { SITE_TIME_ZONE, todayInSiteZone } from "@/lib/site";
+import { addDays, SITE_TIME_ZONE, todayInSiteZone } from "@/lib/site";
 import type { NewsStatus } from "@/lib/types";
 
 /**
@@ -126,12 +126,6 @@ export function hasActiveFilters(filters: NewsFilters): boolean {
 // de 24 h desde ahora. Todo se calcula sobre cadenas "YYYY-MM-DD" y solo al
 // final se convierten a instantes UTC, que es lo que guarda Postgres.
 // ---------------------------------------------------------------------------
-
-/** Aritmética de calendario: UTC aquí es exacto porque no hay hora de por medio. */
-function addDays(day: string, delta: number): string {
-  const [year, month, date] = day.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, date + delta)).toISOString().slice(0, 10);
-}
 
 /** Convierte el preset elegido en un par de días concretos. */
 export function resolveRange(

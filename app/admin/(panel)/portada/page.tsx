@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { requirePanelPermission } from "@/lib/auth/session";
 import { getHomeSlots, getSiteSettings } from "@/lib/data/home";
 import { listAllForAdmin } from "@/lib/data/news";
 
@@ -8,6 +9,8 @@ import { PortadaEditor } from "./PortadaEditor";
 export const metadata: Metadata = { title: "Portada" };
 
 export default async function PortadaPage() {
+  await requirePanelPermission("portada");
+
   const [slots, settings, news] = await Promise.all([
     getHomeSlots(),
     getSiteSettings(),

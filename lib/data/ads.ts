@@ -61,22 +61,30 @@ export const getActiveAds = cache(async (): Promise<Ad[]> => {
 });
 
 /**
- * La campaña que le toca a una zona en este render, o `null` si no hay ninguna.
+ * Las campañas vigentes de una zona, barajadas, o un arreglo vacío si no hay.
  *
- * Cuando hay varias vigentes en la misma zona se elige al azar. Es lo que
- * permite vender el mismo hueco a varios anunciantes el mismo mes sin que uno
- * se coma todas las impresiones.
+ * Se devuelven todas y no una sola porque un hueco puede venderse a varios
+ * anunciantes el mismo mes: el que rota (ver `AdCarousel`) las pasa una tras
+ * otra, y el que no, se queda con la primera.
  *
- * Ojo con el alcance de "al azar": en la portada y en las notas el render está
- * cacheado 5 minutos, así que durante esa ventana todos los visitantes ven el
- * mismo anuncio y la rotación ocurre por regeneración, no por visita. A lo
- * largo de una campaña de semanas el reparto sale parejo igual, y a cambio no
- * se paga con JavaScript de cliente ni rompiendo el renderizado estático.
+ * El barajado es lo que reparte las impresiones. Ojo con su alcance: en la
+ * portada y en las notas el render está cacheado 5 minutos, así que durante esa
+ * ventana todos los visitantes reciben el mismo orden y el sorteo ocurre por
+ * regeneración, no por visita. A lo largo de una campaña de semanas el reparto
+ * sale parejo igual, y a cambio no se paga con una petición de cliente ni
+ * rompiendo el renderizado estático.
  */
-export async function pickAdFor(zone: AdZone): Promise<Ad | null> {
+export async function pickAdsFor(zone: AdZone): Promise<Ad[]> {
   const candidates = (await getActiveAds()).filter((ad) => ad.zone === zone);
-  if (candidates.length === 0) return null;
-  return candidates[Math.floor(Math.random() * candidates.length)];
+
+  // Fisher-Yates sobre una copia: `getActiveAds` está memoizado y el arreglo
+  // que devuelve lo comparten todos los huecos de este render.
+  const shuffled = [...candidates];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
 }
 
 /**

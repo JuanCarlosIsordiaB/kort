@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { requirePanelPermission } from "@/lib/auth/session";
 import { listCategories } from "@/lib/data/categories";
 
 import { CategoriesManager } from "./CategoriesManager";
@@ -7,6 +8,8 @@ import { CategoriesManager } from "./CategoriesManager";
 export const metadata: Metadata = { title: "Secciones" };
 
 export default async function CategoriasPage() {
+  await requirePanelPermission("secciones");
+
   const categories = await listCategories();
 
   return (

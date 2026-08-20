@@ -15,6 +15,7 @@ import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { getSiteSettings } from "@/lib/data/home";
 import { getInlineRecommendations, getPublishedBySlug } from "@/lib/data/news";
+import { getReporterById, profilePath } from "@/lib/data/reporters";
 import { initials } from "@/lib/format";
 import { punct } from "@/lib/punctuation";
 import { breadcrumbJsonLd, organizationJsonLd } from "@/lib/seo";
@@ -87,11 +88,16 @@ export default async function NoticiaPage(props: PageProps<"/noticias/[slug]">) 
   if (!news) notFound();
 
   // Estas sí: hay que saber de qué sección es la nota para poder recomendar
-  // dentro de ella, y cuál es para no recomendarse a sí misma.
-  const recommendations = await getInlineRecommendations(
-    { id: news.id, categoryId: news.category?.id ?? null },
-    { count: settings.inline_recos_count, source: settings.inline_recos_source },
-  );
+  // dentro de ella, y cuál es para no recomendarse a sí misma. La cuenta que
+  // firma se resuelve en paralelo — solo hace falta para saber a dónde apunta
+  // la byline, y viene `null` en las notas sin autor.
+  const [recommendations, reporter] = await Promise.all([
+    getInlineRecommendations(
+      { id: news.id, categoryId: news.category?.id ?? null },
+      { count: settings.inline_recos_count, source: settings.inline_recos_source },
+    ),
+    getReporterById(news.author_id),
+  ]);
 
   // El nombre del autor sale ahora junto al avatar, no dentro de esta línea.
   const readingTime = news.read_minutes ? `${news.read_minutes} min de lectura` : null;
@@ -171,9 +177,37 @@ export default async function NoticiaPage(props: PageProps<"/noticias/[slug]">) 
         {news.excerpt && <p className="mt-4 text-lg text-muted">{punct(news.excerpt)}</p>}
 
         <div className="mt-6 flex items-center gap-3 border-t border-border py-4">
-          <AuthorAvatar name={news.author_name} url={news.author_avatar_url} />
+          {/*
+            La firma lleva a la página del reportero, y la foto repite ese mismo
+            enlace fuera del foco y del lector de pantalla: el nombre ya lo
+            anuncia, y dos enlaces idénticos seguidos solo estorban al tabular.
+            Sin cuenta detrás —notas importadas, o de alguien que ya se dio de
+            baja— la byline se queda como texto.
+          */}
+          {reporter ? (
+            <Link
+              href={profilePath(reporter)}
+              tabIndex={-1}
+              aria-hidden
+              className="shrink-0"
+            >
+              <AuthorAvatar name={news.author_name} url={news.author_avatar_url} />
+            </Link>
+          ) : (
+            <AuthorAvatar name={news.author_name} url={news.author_avatar_url} />
+          )}
           <div>
-            {news.author_name && <p className="text-sm font-bold">{news.author_name}</p>}
+            {news.author_name && (
+              <p className="text-sm font-bold">
+                {reporter ? (
+                  <Link href={profilePath(reporter)} className="hover:underline">
+                    {news.author_name}
+                  </Link>
+                ) : (
+                  news.author_name
+                )}
+              </p>
+            )}
             {/* `<time>` con la fecha en ISO: el texto de arriba está en
                 español y con mes en letra, que un rastreador no puede parsear.
                 El atributo sí. */}

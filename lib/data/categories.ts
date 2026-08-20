@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabasePublic } from "@/lib/supabase/public";
 import { slugify } from "@/lib/slug";
-import type { Category } from "@/lib/types";
+import type { Category, CategoryKind } from "@/lib/types";
 
 /**
  * Único lugar donde se consultan las categorías. Las páginas públicas y los
@@ -32,10 +32,31 @@ export async function getCategoryBySlug(slug: string): Promise<Category | null> 
   return (data as Category) ?? null;
 }
 
-export async function createCategory(name: string): Promise<Category> {
+/**
+ * La sección de Opinión, o `null` si todavía no se ha marcado ninguna.
+ *
+ * `maybeSingle` y no `single` porque no tenerla es un estado válido: el sitio
+ * arranca sin ella y `/opinion` responde 404 hasta que alguien la marque.
+ * El índice parcial de 0010_opinion.sql impide que haya dos.
+ */
+export async function getOpinionCategory(): Promise<Category | null> {
+  const { data, error } = await supabasePublic()
+    .from("categories")
+    .select("*")
+    .eq("kind", "opinion")
+    .maybeSingle();
+
+  if (error) throw new Error(`No se pudo leer la sección de Opinión: ${error.message}`);
+  return (data as Category) ?? null;
+}
+
+export async function createCategory(
+  name: string,
+  kind: CategoryKind = "noticia",
+): Promise<Category> {
   const { data, error } = await supabaseAdmin()
     .from("categories")
-    .insert({ name: name.trim(), slug: slugify(name) })
+    .insert({ name: name.trim(), slug: slugify(name), kind })
     .select("*")
     .single();
 
@@ -43,16 +64,29 @@ export async function createCategory(name: string): Promise<Category> {
   return data as Category;
 }
 
-export async function updateCategory(id: string, name: string): Promise<Category> {
+export async function updateCategory(
+  id: string,
+  name: string,
+  kind: CategoryKind = "noticia",
+): Promise<Category> {
   const { data, error } = await supabaseAdmin()
     .from("categories")
-    .update({ name: name.trim(), slug: slugify(name) })
+    .update({ name: name.trim(), slug: slugify(name), kind })
     .eq("id", id)
     .select("*")
     .single();
 
   if (error) throw new Error(error.message);
   return data as Category;
+}
+
+/**
+ * Postgres avisa con 23505 cuando ya hay otra sección marcada como Opinión: el
+ * índice `categories_single_opinion_idx` es único. Se traduce arriba, en el
+ * route handler, a un 409 con un mensaje que el editor entienda.
+ */
+export function isDuplicateOpinionError(message: string): boolean {
+  return message.includes("categories_single_opinion_idx");
 }
 
 /** Cuántas noticias apuntan a esta categoría. Decide si se puede borrar. */

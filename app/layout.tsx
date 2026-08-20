@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
 
 import { InlineScript } from "@/components/site/InlineScript";
+import { ViewTracker } from "@/components/site/ViewTracker";
 import { getSiteSettings } from "@/lib/data/home";
 import { SITE_DESCRIPTION } from "@/lib/seo";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
@@ -83,6 +84,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         se siguen reportando igual.
       */}
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        {/* No pinta nada: cuenta la visita para la página de Estadísticas del
+            panel. Va aquí para cubrir el sitio entero de una vez. */}
+        <ViewTracker />
         {children}
       </body>
     </html>

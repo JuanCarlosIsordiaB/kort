@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 
+import { normalizeRole } from "@/lib/auth/roles";
 import { setSessionCookie } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
 
   const { data: admin, error } = await supabaseAdmin()
     .from("admins")
-    .select("id, email, display_name, password_hash")
+    .select("id, email, display_name, password_hash, role")
     .eq("email", email)
     .maybeSingle();
 
@@ -31,9 +32,11 @@ export async function POST(request: Request) {
     return Response.json(INVALID, { status: 401 });
   }
 
-  await setSessionCookie({ adminId: admin.id, email: admin.email });
+  const role = normalizeRole(admin.role);
+
+  await setSessionCookie({ adminId: admin.id, email: admin.email, role });
 
   return Response.json({
-    admin: { id: admin.id, email: admin.email, display_name: admin.display_name },
+    admin: { id: admin.id, email: admin.email, display_name: admin.display_name, role },
   });
 }

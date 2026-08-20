@@ -3,13 +3,19 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import type { Category } from "@/lib/types";
+import type { Category, CategoryKind } from "@/lib/types";
 
 export function CategoriesManager({ initialCategories }: { initialCategories: Category[] }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+  /*
+    El tipo viaja siempre en el `PUT`, no solo cuando se toca la casilla: el
+    servidor guarda lo que reciba, así que renombrar la sección de Opinión sin
+    mandarlo la devolvería a ser una sección normal.
+  */
+  const [editingKind, setEditingKind] = useState<CategoryKind>("noticia");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -41,7 +47,7 @@ export function CategoriesManager({ initialCategories }: { initialCategories: Ca
   }
 
   async function saveEdit(id: string) {
-    if (await send(`/api/categorias/${id}`, "PUT", { name: editingName })) {
+    if (await send(`/api/categorias/${id}`, "PUT", { name: editingName, kind: editingKind })) {
       setEditingId(null);
     }
   }
@@ -92,6 +98,24 @@ export function CategoriesManager({ initialCategories }: { initialCategories: Ca
                     onChange={(e) => setEditingName(e.target.value)}
                     className="min-w-0 flex-1 basis-full rounded-[var(--radius-thumb)] border border-border bg-input px-2 py-1.5 text-sm sm:basis-auto"
                   />
+                  <label className="flex basis-full items-start gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={editingKind === "opinion"}
+                      onChange={(e) =>
+                        setEditingKind(e.target.checked ? "opinion" : "noticia")
+                      }
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <span className="font-semibold">Esta es la sección de Opinión</span>
+                      <span className="mt-0.5 block text-muted">
+                        Se lista en /opinion con las tarjetas de columnista —el
+                        autor y su columna al frente— en vez del formato normal
+                        de sección. Solo puede haber una.
+                      </span>
+                    </span>
+                  </label>
                   <div className="ml-auto flex items-center gap-4">
                     <button
                       type="button"
@@ -114,7 +138,14 @@ export function CategoriesManager({ initialCategories }: { initialCategories: Ca
                 <>
                   <div className="flex min-w-0 flex-1 basis-full items-baseline gap-2 sm:basis-auto">
                     <span className="truncate font-semibold">{category.name}</span>
-                    <code className="shrink-0 text-xs text-muted">/{category.slug}</code>
+                    <code className="shrink-0 text-xs text-muted">
+                      {category.kind === "opinion" ? "/opinion" : `/${category.slug}`}
+                    </code>
+                    {category.kind === "opinion" && (
+                      <span className="shrink-0 rounded-[var(--radius-pill)] border border-accent px-2 py-0.5 text-[10px] font-extrabold tracking-[1px] text-accent">
+                        OPINIÓN
+                      </span>
+                    )}
                   </div>
                   <div className="ml-auto flex items-center gap-4">
                     <button
@@ -122,6 +153,7 @@ export function CategoriesManager({ initialCategories }: { initialCategories: Ca
                       onClick={() => {
                         setEditingId(category.id);
                         setEditingName(category.name);
+                        setEditingKind(category.kind);
                       }}
                       className="py-1 text-xs font-semibold underline"
                     >

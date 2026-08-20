@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 
 import { AdForm } from "@/components/admin/AdForm";
+import { requirePanelPermission } from "@/lib/auth/session";
 import { todayInSiteZone } from "@/lib/site";
 
 export const metadata: Metadata = { title: "Nueva campaña" };
 
-export default function NuevaCampanaPage() {
+export default async function NuevaCampanaPage() {
+  await requirePanelPermission("publicidad");
+
   return (
     <div>
       <h1 className="mb-1 text-2xl font-extrabold sm:text-3xl">Nueva campaña</h1>

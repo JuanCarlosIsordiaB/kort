@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AdSlot } from "@/components/ads/AdSlot";
-import { CardGrid, CategoryRail, NowBar } from "@/components/home/CardGrid";
+import { CardGrid, NowBar } from "@/components/home/CardGrid";
+import { CategoryRows } from "@/components/home/CategoryRows";
 import { LeadPackage } from "@/components/home/LeadPackage";
 import { NewsletterBand } from "@/components/home/NewsletterBand";
 import { OpinionRow } from "@/components/home/OpinionRow";
@@ -10,7 +11,6 @@ import { SidebarTabs } from "@/components/home/SidebarTabs";
 import { JsonLd } from "@/components/site/JsonLd";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader } from "@/components/site/SiteHeader";
-import { listCategories } from "@/lib/data/categories";
 import { getHomeData } from "@/lib/data/home";
 import { organizationJsonLd, SITE_DESCRIPTION } from "@/lib/seo";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
@@ -57,8 +57,9 @@ const homeJsonLd = {
 };
 
 export default async function HomePage() {
-  const [home, categories] = await Promise.all([getHomeData(), listCategories()]);
-  const { settings, lead, breaking, featured, opinion, grid } = home;
+  const home = await getHomeData();
+  const { settings, lead, leadImages, breaking, featured, opinion, grid, categoryRows } =
+    home;
 
   return (
     <div>
@@ -79,7 +80,11 @@ export default async function HomePage() {
             {/* Lo de arriba del pliegue entra al cargar; las tarjetas de abajo
                 se revelan solas al entrar en pantalla (`kort-reveal`). */}
             <div className="kort-stagger grid lg:grid-cols-[1.7fr_1fr]">
-              <LeadPackage news={lead} headlineHtml={settings.hero_headline_html} />
+              <LeadPackage
+                news={lead}
+                headlineHtml={settings.hero_headline_html}
+                images={leadImages}
+              />
 
               {/* El anuncio va dentro de la misma celda del grid que el
                   sidebar, no como una tercera columna: la portada son dos
@@ -90,13 +95,22 @@ export default async function HomePage() {
               </div>
             </div>
 
-            <NowBar />
+            {/* La barra anuncia lo que viene abajo, así que no se pinta si
+                abajo no hay nada: sola se lee como una sección rota. */}
+            {(grid.length > 0 || categoryRows.length > 0) && (
+              <>
+                <NowBar />
 
-            <div className="px-6 pt-8 pb-2 md:px-10">
-              <CategoryRail categories={categories} />
-              <CardGrid items={grid} />
-              <AdSlot zone="home-mid" className="mt-8" />
-            </div>
+                <div className="px-6 pt-8 pb-2 md:px-10">
+                  <CardGrid items={grid} />
+                  <CategoryRows rows={categoryRows} />
+                  {/* Este hueco cicla: cuando hay varias campañas vendidas
+                      a media portada se van pasando en vez de quedarse una
+                      fija toda la ventana de caché. */}
+                  <AdSlot zone="home-mid" rotate className="mt-8" />
+                </div>
+              </>
+            )}
 
             <OpinionRow items={opinion} />
           </>

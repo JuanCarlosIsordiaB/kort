@@ -1,6 +1,10 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
+import { LOGIN_PATH } from "@/lib/auth/constants";
+import { can } from "@/lib/auth/roles";
+import { getCurrentAdmin } from "@/lib/auth/session";
 import { listCategories } from "@/lib/data/categories";
 import { countAllForAdmin, listAllForAdmin } from "@/lib/data/news";
 import { hasActiveFilters, parseFilters, resolveRange } from "@/lib/news-filters";
@@ -24,6 +28,15 @@ export default async function DashboardPage(props: PageProps<"/admin">) {
   const filters = parseFilters(await props.searchParams);
   const range = resolveRange(filters);
 
+  // El layout ya rebotó a quien no tiene sesión, pero aquí el id del admin es
+  // lo que acota la consulta: sin él no hay listado que mostrar.
+  const admin = await getCurrentAdmin();
+  if (!admin) redirect(LOGIN_PATH);
+
+  // Un reportero solo ve lo suyo; un administrador, la redacción completa.
+  const onlyMine = !can(admin.role, "noticias:ajenas");
+  const authorId = onlyMine ? admin.id : undefined;
+
   const [news, total, categories] = await Promise.all([
     listAllForAdmin({
       q: filters.q,
@@ -32,8 +45,9 @@ export default async function DashboardPage(props: PageProps<"/admin">) {
       dateField: filters.dateField,
       from: range.from || undefined,
       to: range.to || undefined,
+      authorId,
     }),
-    countAllForAdmin(),
+    countAllForAdmin(authorId),
     listCategories(),
   ]);
 
@@ -44,7 +58,9 @@ export default async function DashboardPage(props: PageProps<"/admin">) {
     // mientras llega el render nuevo del servidor, sin coordinar estado.
     <div className="group">
       <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-extrabold sm:text-3xl">Noticias</h1>
+        <h1 className="text-2xl font-extrabold sm:text-3xl">
+          {onlyMine ? "Mis noticias" : "Noticias"}
+        </h1>
         <Link
           href="/admin/noticias/nueva"
           className="rounded-[var(--radius-pill)] bg-accent px-4 py-2 text-sm font-bold text-accent-foreground"
@@ -65,7 +81,9 @@ export default async function DashboardPage(props: PageProps<"/admin">) {
           <p className="rounded-[var(--radius-card)] border border-border p-8 text-center text-sm text-muted">
             {filtering
               ? "Ninguna noticia coincide con estos filtros."
-              : "Todavía no hay noticias. Crea la primera."}
+              : onlyMine
+                ? "Todavía no has publicado ninguna noticia. Crea la primera."
+                : "Todavía no hay noticias. Crea la primera."}
           </p>
         ) : (
           <>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { categoryPath } from "@/lib/category-path";
 import { listCategories } from "@/lib/data/categories";
 import { upper } from "@/lib/format";
 
@@ -34,7 +35,7 @@ export async function SiteHeader({ compact = false }: { compact?: boolean }) {
             {categories.map((category) => (
               <Link
                 key={category.id}
-                href={`/categoria/${category.slug}`}
+                href={categoryPath(category)}
                 className="whitespace-nowrap text-xs font-bold tracking-[1.4px] text-muted transition-colors hover:text-foreground"
               >
                 {upper(category.name)}

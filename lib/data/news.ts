@@ -23,13 +23,18 @@ export const PAGE_SIZE = 12;
  * listado público no tiene por qué cargar el JSON de Tiptap ni el `status`.
  */
 export const PUBLIC_COLUMNS =
-  "id, title, slug, excerpt, cover_image_url, cover_focus_x, cover_focus_y, author_name, author_avatar_url, read_minutes, view_count, published_at, category:categories(id, name, slug)";
+  "id, title, slug, excerpt, cover_image_url, cover_focus_x, cover_focus_y, author_id, author_name, author_avatar_url, read_minutes, view_count, published_at, category:categories(id, name, slug)";
 
 // El detalle sí trae la galería completa; los listados no la necesitan y sería
 // traer decenas de filas de más por página.
 // `created_at` y `updated_at` solo aquí: el detalle los publica como
 // `datePublished`/`dateModified` en los datos estructurados, y sin ellos Google
 // no sabe que una nota se corrigió. Los listados no los necesitan.
+// `author_id` viaja desde `PUBLIC_COLUMNS`: es lo que enlaza la firma con la
+// página del autor, y `/opinion` lo necesita en el listado para resolver el
+// nombre de la columna de quien firma. La byline se sigue pintando con
+// `author_name`, que es el nombre con el que se firmó; el id solo dice a qué
+// cuenta apuntar, y en las notas viejas viene en NULL.
 const PUBLIC_DETAIL_COLUMNS = `${PUBLIC_COLUMNS}, content_html, created_at, updated_at, images:news_images(id, news_id, url, alt, position, visible, focus_x, focus_y)`;
 
 // ---------------------------------------------------------------------------
@@ -45,6 +50,8 @@ const PUBLIC_DETAIL_COLUMNS = `${PUBLIC_COLUMNS}, content_html, created_at, upda
 export async function listPublished(options: {
   page?: number;
   categoryId?: string;
+  /** Solo lo que firmó esta cuenta. Es lo que pinta la página de un reportero. */
+  authorId?: string;
 } = {}): Promise<Paginated<NewsWithCategory>> {
   const page = Math.max(1, options.page ?? 1);
   const from = (page - 1) * PAGE_SIZE;
@@ -58,6 +65,10 @@ export async function listPublished(options: {
 
   if (options.categoryId) {
     query = query.eq("category_id", options.categoryId);
+  }
+
+  if (options.authorId) {
+    query = query.eq("author_id", options.authorId);
   }
 
   const { data, error, count } = await query;
@@ -232,6 +243,11 @@ export interface AdminNewsFilters {
   /** Días "YYYY-MM-DD" en la zona del sitio, ambos inclusive. */
   from?: string;
   to?: string;
+  /**
+   * Solo las notas que firmó este admin. Es lo que acota el listado de un
+   * reportero, que únicamente trabaja las suyas.
+   */
+  authorId?: string;
 }
 
 /**
@@ -256,6 +272,8 @@ export async function listAllForAdmin(
     .select(`${PUBLIC_COLUMNS}, status, created_at, updated_at`)
     .order("updated_at", { ascending: false });
 
+  if (filters.authorId) query = query.eq("author_id", filters.authorId);
+
   const term = filters.q?.trim();
   if (term) {
     query = query.or(`title.ilike.${likeValue(term)},excerpt.ilike.${likeValue(term)}`);
@@ -278,14 +296,42 @@ export async function listAllForAdmin(
   return (data ?? []) as unknown as NewsWithCategory[];
 }
 
-/** Cuántas noticias hay en total, para poder decir "6 de 40" al filtrar. */
-export async function countAllForAdmin(): Promise<number> {
-  const { count, error } = await supabaseAdmin()
-    .from("news")
-    .select("id", { count: "exact", head: true });
+/**
+ * Cuántas noticias hay en total, para poder decir "6 de 40" al filtrar.
+ * Con `authorId`, cuántas tiene ese admin: el total que ve un reportero tiene
+ * que ser el mismo universo que su listado, o el "de 40" no cuadraría.
+ */
+export async function countAllForAdmin(authorId?: string): Promise<number> {
+  let query = supabaseAdmin().from("news").select("id", { count: "exact", head: true });
+  if (authorId) query = query.eq("author_id", authorId);
+
+  const { count, error } = await query;
 
   if (error) throw new Error(error.message);
   return count ?? 0;
+}
+
+/**
+ * Quién firma una nota, sin traerse el JSON del cuerpo. Es lo único que hace
+ * falta para decidir si un reportero puede tocarla.
+ *
+ * Distingue "no existe" (`null`) de "existe y no tiene autor" (`undefined` en
+ * la columna, que sale como `{ author_id: null }`): borrar al admin que la
+ * firmó deja `author_id` en NULL, y esa nota no es de nadie — solo la puede
+ * mover un administrador.
+ */
+export async function getNewsAuthorId(
+  id: string,
+): Promise<{ authorId: string | null } | null> {
+  const { data, error } = await supabaseAdmin()
+    .from("news")
+    .select("author_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return { authorId: (data as { author_id: string | null }).author_id };
 }
 
 export async function getNewsById(id: string): Promise<News | null> {

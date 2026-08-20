@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 
-import { requireAdmin } from "@/lib/auth/session";
+import { requirePermission } from "@/lib/auth/session";
 import { getHomeSlots, getSiteSettings, type HomeSlot } from "@/lib/data/home";
 import { MAX_RECOMMENDATIONS } from "@/lib/news-input";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -21,7 +21,7 @@ function clampCount(value: unknown, fallback: number): number {
 }
 
 export async function GET() {
-  const admin = await requireAdmin();
+  const admin = await requirePermission("portada");
   if (admin instanceof Response) return admin;
 
   const [slots, settings] = await Promise.all([getHomeSlots(), getSiteSettings()]);
@@ -29,7 +29,7 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requirePermission("portada");
   if (admin instanceof Response) return admin;
 
   const body = await request.json().catch(() => null);

@@ -1,5 +1,8 @@
 import { revalidatePath } from "next/cache";
 
+import { revalidateOpinion } from "@/lib/revalidate-opinion";
+
+import { can } from "@/lib/auth/roles";
 import { requireAdmin } from "@/lib/auth/session";
 import { createNews, listAllForAdmin, listPublished } from "@/lib/data/news";
 import { parseNewsInput } from "@/lib/news-input";
@@ -14,7 +17,10 @@ export async function GET(request: Request) {
     if (admin instanceof Response) return admin;
 
     try {
-      return Response.json({ news: await listAllForAdmin() });
+      // Un reportero solo se lleva las suyas: el listado del panel es el mismo
+      // universo sobre el que puede actuar.
+      const authorId = can(admin.role, "noticias:ajenas") ? undefined : admin.id;
+      return Response.json({ news: await listAllForAdmin({ authorId }) });
     } catch (error) {
       return Response.json({ error: (error as Error).message }, { status: 500 });
     }
@@ -50,6 +56,7 @@ export async function POST(request: Request) {
       avatar_url: admin.avatar_url,
     });
     revalidatePath("/"); // la portada es ISR
+    revalidateOpinion(); // por si la nota es de la sección de Opinión
     return Response.json({ news }, { status: 201 });
   } catch (error) {
     return Response.json({ error: (error as Error).message }, { status: 500 });

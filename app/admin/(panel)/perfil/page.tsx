@@ -16,7 +16,8 @@ export default async function PerfilPage() {
     <div className="max-w-xl">
       <h1 className="mb-1 text-2xl font-extrabold sm:text-3xl">Mi perfil</h1>
       <p className="mb-8 text-sm text-muted">
-        Tu nombre y tu foto salen en la firma de las notas que publicas.
+        Tu nombre y tu foto salen en la firma de las notas que publicas. Tus
+        redes salen en tu página de autor, la misma a la que lleva esa firma.
       </p>
 
       <PerfilForm admin={admin} />
