@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ImageManager } from "@/components/admin/ImageManager";
+import { NewsPicker } from "@/components/admin/NewsPicker";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { MAX_EXTRA_CATEGORIES, MAX_RECOMMENDATIONS } from "@/lib/news-input";
 import type {
@@ -11,8 +12,8 @@ import type {
   News,
   NewsImage,
   NewsImageInput,
+  NewsOption,
   NewsStatus,
-  NewsWithCategory,
 } from "@/lib/types";
 
 export interface NewsFormProps {
@@ -27,10 +28,10 @@ export interface NewsFormProps {
    * así que solo se sabe en el momento de dibujar las casillas.
    */
   sections?: string[];
-  /** Las publicadas, para poder elegir a mano qué se recomienda en el texto. */
-  recommendable?: NewsWithCategory[];
   /** Picks manuales existentes al editar, en orden. */
   recommendations?: string[];
+  /** Los títulos de esos picks, para pintarlos sin volver a pedirlos. */
+  recommendedOptions?: NewsOption[];
 }
 
 /** El tinte de una casilla de sección, según cómo esté. */
@@ -45,8 +46,8 @@ export function NewsForm({
   news,
   images: initialImages = [],
   sections: initialSections = [],
-  recommendable = [],
   recommendations: initialRecommendations = [],
+  recommendedOptions = [],
 }: NewsFormProps) {
   const router = useRouter();
 
@@ -73,6 +74,13 @@ export function NewsForm({
 
   const [recommendations, setRecommendations] = useState<string[]>(initialRecommendations);
 
+  // Lo que se sabe de cada nota recomendada, por id: lo que ya estaba puesto
+  // más lo que se elija en el buscador. Los renglones se compactan al quitar
+  // uno, así que el título no puede vivir dentro del selector.
+  const [known, setKnown] = useState(
+    () => new Map(recommendedOptions.map((option) => [option.id, option])),
+  );
+
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -91,10 +99,12 @@ export function NewsForm({
   // Siempre un renglón vacío de más para poder agregar, y nunca más del tope.
   const recommendationRows = [...recommendations, ""].slice(0, MAX_RECOMMENDATIONS);
 
-  function setRecommendation(index: number, id: string) {
+  function setRecommendation(index: number, option: NewsOption | null) {
+    if (option) setKnown((prev) => new Map(prev).set(option.id, option));
+
     setRecommendations((prev) => {
       const next = [...prev];
-      if (id) next[index] = id;
+      if (option) next[index] = option.id;
       else next.splice(index, 1);
       // Compacta y sin repetidos: dos veces la misma nota daría dos tarjetas
       // idénticas en el mismo artículo.
@@ -282,29 +292,19 @@ export function NewsForm({
           </span>
         </span>
 
-        {/* La nota se excluye de su propia lista: recomendarse a sí misma no
-            solo no sirve, la base lo rechaza con un CHECK. */}
+        {/* La nota se excluye de su propia lista —`excludeId`—: recomendarse a
+            sí misma no solo no sirve, la base lo rechaza con un CHECK. */}
         {recommendationRows.map((id, index) => (
-          <select
+          <NewsPicker
             key={`reco-${index}`}
             value={id}
-            onChange={(e) => setRecommendation(index, e.target.value)}
-            className="w-full min-w-0 rounded-[var(--radius-thumb)] border border-border bg-input px-3 py-2 text-sm"
-          >
-            <option value="">
-              {index < recommendations.length
-                ? "— quitar —"
-                : "— automático (lo que diga Portada) —"}
-            </option>
-            {recommendable
-              .filter((n) => n.id !== news?.id)
-              .map((n) => (
-                <option key={n.id} value={n.id}>
-                  {n.category?.name ? `[${n.category.name}] ` : ""}
-                  {n.title}
-                </option>
-              ))}
-          </select>
+            option={known.get(id)}
+            onPick={(option) => setRecommendation(index, option)}
+            categories={categories}
+            excludeId={news?.id}
+            ariaLabel={`Nota recomendada ${index + 1}`}
+            emptyLabel="— automático (lo que diga Portada) —"
+          />
         ))}
       </div>
 

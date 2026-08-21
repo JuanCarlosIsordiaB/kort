@@ -16,6 +16,18 @@ import type { NewsStatus } from "@/lib/types";
 /** El valor del select de sección para "las que no tienen ninguna". */
 export const NO_CATEGORY = "sin-seccion";
 
+/**
+ * Cuántas notas trae de una el buscador de los selectores (portada y notas
+ * recomendadas). Es el corte que mantiene la lista legible sin recortar por
+ * fecha: un "últimos 7 días" dejaría el selector vacío en una semana floja, y
+ * entonces no habría de dónde elegir.
+ *
+ * Vive aquí y no en `lib/data/news.ts` porque lo leen las dos mitades: el
+ * servidor para consultar y el selector para avisar "hay más, afina la
+ * búsqueda".
+ */
+export const NEWS_OPTIONS_LIMIT = 25;
+
 /** Sobre qué columna de fecha aplica el rango. */
 export type DateField = "updated_at" | "published_at";
 

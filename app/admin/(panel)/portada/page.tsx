@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 
 import { requirePanelPermission } from "@/lib/auth/session";
+import { listCategories } from "@/lib/data/categories";
 import { getHomeSlots, getSiteSettings } from "@/lib/data/home";
-import { listAllForAdmin } from "@/lib/data/news";
+import { listNewsOptionsByIds } from "@/lib/data/news";
 
 import { PortadaEditor } from "./PortadaEditor";
 
@@ -11,14 +12,16 @@ export const metadata: Metadata = { title: "Portada" };
 export default async function PortadaPage() {
   await requirePanelPermission("portada");
 
-  const [slots, settings, news] = await Promise.all([
+  const [slots, settings, categories] = await Promise.all([
     getHomeSlots(),
     getSiteSettings(),
-    listAllForAdmin(),
+    listCategories(),
   ]);
 
-  // Solo se puede curar lo que el público puede ver.
-  const published = news.filter((n) => n.status === "published");
+  // Solo los títulos de lo que ya está puesto: el resto lo busca el selector
+  // contra el servidor. Antes se mandaba el catálogo entero de publicadas, que
+  // con el archivo creciendo era la mayor parte del HTML de esta página.
+  const options = await listNewsOptionsByIds(Object.values(slots).flat());
 
   return (
     <div className="max-w-3xl">
@@ -28,7 +31,12 @@ export default async function PortadaPage() {
         con lo más reciente, así que la portada nunca se ve rota.
       </p>
 
-      <PortadaEditor initialSlots={slots} initialSettings={settings} news={published} />
+      <PortadaEditor
+        initialSlots={slots}
+        initialSettings={settings}
+        categories={categories}
+        initialOptions={options}
+      />
     </div>
   );
 }

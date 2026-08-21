@@ -3,44 +3,70 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { NewsPicker } from "@/components/admin/NewsPicker";
 import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import type { HomeSlot, SiteSettings } from "@/lib/data/home";
 import { punct } from "@/lib/punctuation";
-import type { NewsWithCategory } from "@/lib/types";
+import type { Category, NewsOption } from "@/lib/types";
 
-const SLOT_INFO: Record<HomeSlot, { label: string; help: string; max: number }> = {
+/**
+ * Los huecos de la portada, con la columna de `site_settings` que apaga su
+ * relleno automático (ver 0015_portada_vacia.sql).
+ */
+const SLOT_INFO: Record<
+  HomeSlot,
+  { label: string; help: string; max: number; autofill: AutofillKey; empty: string }
+> = {
   lead: {
     label: "Nota principal",
     help: "La del titular grande, con su extracto y foto grande.",
     max: 1,
+    autofill: "autofill_lead",
+    empty: "La portada arranca directo en la rejilla, sin titular grande.",
   },
   breaking: {
     label: "Último minuto",
     help: "Primera pestaña del sidebar derecho.",
     max: 3,
+    autofill: "autofill_breaking",
+    empty: "La pestaña se queda con su aviso de que no hay nada.",
   },
   featured: {
     label: "Destacadas",
     help: "Segunda pestaña del sidebar derecho.",
     max: 3,
+    autofill: "autofill_featured",
+    empty: "La pestaña se queda con su aviso de que no hay nada.",
   },
   opinion: {
     label: "Opinión",
     help: "La fila de abajo, con el avatar de iniciales del autor.",
     max: 2,
+    autofill: "autofill_opinion",
+    empty: "La fila de Opinión no aparece en la portada.",
   },
 };
+
+type AutofillKey =
+  | "autofill_lead"
+  | "autofill_breaking"
+  | "autofill_featured"
+  | "autofill_opinion";
 
 const SLOTS = Object.keys(SLOT_INFO) as HomeSlot[];
 
 export function PortadaEditor({
   initialSlots,
   initialSettings,
-  news,
+  categories,
+  initialOptions,
 }: {
   initialSlots: Record<HomeSlot, string[]>;
   initialSettings: SiteSettings;
-  news: NewsWithCategory[];
+  /** Para el filtro por sección del buscador. */
+  categories: Category[];
+  /** Las notas que ya estaban puestas, para pintar su título al abrir. */
+  initialOptions: NewsOption[];
 }) {
   const router = useRouter();
 
@@ -54,16 +80,32 @@ export function PortadaEditor({
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
 
-  const byId = new Map(news.map((n) => [n.id, n]));
+  /**
+   * Lo que se sabe de cada nota, por id: lo que ya estaba puesto más lo que se
+   * vaya eligiendo en los buscadores.
+   *
+   * El catálogo vive aquí y no dentro de cada selector porque las flechas de
+   * reordenar intercambian ids entre renglones: con el título guardado en el
+   * selector, subir una nota dejaría el título pegado en el lugar de antes.
+   */
+  const [known, setKnown] = useState(
+    () => new Map(initialOptions.map((option) => [option.id, option])),
+  );
 
-  function setPick(slot: HomeSlot, index: number, id: string) {
+  function setPick(slot: HomeSlot, index: number, picked: NewsOption | null) {
+    if (picked) setKnown((prev) => new Map(prev).set(picked.id, picked));
+
     setSlots((prev) => {
       const next = [...prev[slot]];
-      if (id) next[index] = id;
+      if (picked) next[index] = picked.id;
       else next.splice(index, 1);
       // Compacta: sin huecos intermedios vacíos.
       return { ...prev, [slot]: next.filter(Boolean) };
     });
+  }
+
+  function setAutofill(key: AutofillKey, value: boolean) {
+    setSettings((s) => ({ ...s, [key]: value }));
   }
 
   function move(slot: HomeSlot, index: number, delta: number) {
@@ -112,6 +154,7 @@ export function PortadaEditor({
       {SLOTS.map((slot) => {
         const info = SLOT_INFO[slot];
         const picked = slots[slot];
+        const autofill = settings[info.autofill];
         const rows = [...picked, ""].slice(0, info.max);
 
         return (
@@ -119,28 +162,39 @@ export function PortadaEditor({
             <h2 className="text-sm font-extrabold uppercase tracking-wide">{info.label}</h2>
             <p className="mb-3 text-xs text-muted">{info.help}</p>
 
+            {/* El apagador va antes de los selectores porque cambia lo que
+                significan: con él prendido, lo que dejes sin elegir lo llena el
+                sitio; apagado, lo que dejes sin elegir se queda vacío. */}
+            <div className="mb-3 flex flex-col gap-1">
+              <Toggle
+                checked={autofill}
+                onChange={(v) => setAutofill(info.autofill, v)}
+                label="Completar con lo más reciente"
+              />
+              <p className="text-xs text-muted">
+                {autofill
+                  ? "Los lugares que dejes sin elegir se llenan solos con lo último publicado."
+                  : `Solo sale lo que elijas aquí. Sin nada elegido: ${lower(info.empty)}`}
+              </p>
+            </div>
+
             <div className="flex flex-col gap-2">
               {rows.map((id, index) => (
                 <div key={`${slot}-${index}`} className="flex items-center gap-2">
                   <span className="w-4 shrink-0 text-xs font-bold text-muted">{index + 1}</span>
 
-                  {/* `min-w-0`: si no, el título más largo de la lista fija el
-                      ancho mínimo del select y desborda la pantalla en móvil. */}
-                  <select
+                  <NewsPicker
                     value={id}
-                    onChange={(e) => setPick(slot, index, e.target.value)}
-                    className="w-full min-w-0 flex-1 rounded-[var(--radius-thumb)] border border-border bg-input px-3 py-2 text-sm"
-                  >
-                    <option value="">
-                      {index < picked.length ? "— quitar —" : "— automático (lo más reciente) —"}
-                    </option>
-                    {news.map((n) => (
-                      <option key={n.id} value={n.id}>
-                        {n.category?.name ? `[${n.category.name}] ` : ""}
-                        {n.title}
-                      </option>
-                    ))}
-                  </select>
+                    option={known.get(id)}
+                    onPick={(option) => setPick(slot, index, option)}
+                    categories={categories}
+                    ariaLabel={`${info.label}, lugar ${index + 1}`}
+                    emptyLabel={
+                      autofill
+                        ? "— automático (lo más reciente) —"
+                        : "— vacío (no se muestra nada) —"
+                    }
+                  />
 
                   {info.max > 1 && index < picked.length && (
                     <>
@@ -172,7 +226,7 @@ export function PortadaEditor({
 
             {slot === "lead" && picked[0] && (
               <p className="mt-2 text-xs text-muted">
-                Titular del artículo: <em>{byId.get(picked[0])?.title}</em>
+                Titular del artículo: <em>{known.get(picked[0])?.title}</em>
               </p>
             )}
           </section>
@@ -326,6 +380,11 @@ export function PortadaEditor({
       </div>
     </div>
   );
+}
+
+/** La frase del hueco vacío, pegada después de dos puntos. */
+function lower(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1);
 }
 
 /**

@@ -61,6 +61,17 @@ export default async function HomePage() {
   const { settings, lead, leadImages, breaking, featured, opinion, grid, categoryRows } =
     home;
 
+  const hasSidebar = breaking.length > 0 || featured.length > 0;
+  // El aviso de "todavía no hay noticias" es para un sitio recién instalado, no
+  // para una portada que el panel dejó a propósito con menos bloques: basta con
+  // que quede algo en pie para no pintarlo.
+  const hasContent =
+    Boolean(lead) ||
+    hasSidebar ||
+    grid.length > 0 ||
+    categoryRows.length > 0 ||
+    opinion.length > 0;
+
   return (
     <div>
       <JsonLd data={homeJsonLd} />
@@ -75,25 +86,39 @@ export default async function HomePage() {
 
         <AdSlot zone="home-top" className="px-6 pt-6 md:px-10" />
 
-        {lead ? (
+        {hasContent ? (
           <>
             {/* Lo de arriba del pliegue entra al cargar; las tarjetas de abajo
                 se revelan solas al entrar en pantalla (`kort-reveal`). */}
-            <div className="kort-stagger grid lg:grid-cols-[1.7fr_1fr]">
-              <LeadPackage
-                news={lead}
-                headlineHtml={settings.hero_headline_html}
-                images={leadImages}
-              />
+            {lead ? (
+              <div className="kort-stagger grid lg:grid-cols-[1.7fr_1fr]">
+                <LeadPackage
+                  news={lead}
+                  headlineHtml={settings.hero_headline_html}
+                  images={leadImages}
+                />
 
-              {/* El anuncio va dentro de la misma celda del grid que el
-                  sidebar, no como una tercera columna: la portada son dos
-                  columnas y el hueco cuelga de la derecha. */}
-              <div>
-                <SidebarTabs breaking={breaking} featured={featured} />
-                <AdSlot zone="home-sidebar" className="px-6 pb-11 md:px-10" />
+                {/* El anuncio va dentro de la misma celda del grid que el
+                    sidebar, no como una tercera columna: la portada son dos
+                    columnas y el hueco cuelga de la derecha. */}
+                <div>
+                  <SidebarTabs breaking={breaking} featured={featured} />
+                  <AdSlot zone="home-sidebar" className="px-6 pb-11 md:px-10" />
+                </div>
               </div>
-            </div>
+            ) : (
+              // Sin nota principal —porque el panel apagó ese hueco— no hay dos
+              // columnas que repartir: el sidebar pasa a ancho completo y la
+              // portada arranca en él. Si tampoco hay sidebar, arranca en la
+              // rejilla, que es justo la portada limpia que se pidió poder
+              // dejar.
+              hasSidebar && (
+                <div className="kort-stagger">
+                  <SidebarTabs breaking={breaking} featured={featured} />
+                  <AdSlot zone="home-sidebar" className="px-6 pb-11 md:px-10" />
+                </div>
+              )
+            )}
 
             {/* La barra anuncia lo que viene abajo, así que no se pinta si
                 abajo no hay nada: sola se lee como una sección rota. */}

@@ -12,6 +12,11 @@ import type { Category, NewsImage, NewsWithCategory } from "@/lib/types";
  * llena solo con lo más reciente publicado: la portada nunca debe verse rota
  * porque nadie entró a curarla, y el sitio tiene que funcionar desde la primera
  * nota publicada sin configurar nada.
+ *
+ * Ese relleno se puede apagar hueco por hueco desde el panel (`autofill_*` en
+ * `site_settings`), que es como se deja un bloque limpio a propósito o se
+ * enseña una sola columna de opinión sin que aparezca una segunda que nadie
+ * pidió.
  */
 
 export type HomeSlot = "lead" | "breaking" | "featured" | "opinion";
@@ -37,6 +42,19 @@ export interface SiteSettings {
   inline_recos_count: number;
   inline_recos_source: RecoSource;
   inline_recos_label: string;
+  /**
+   * Si cada hueco de la portada se rellena solo con lo más reciente cuando el
+   * panel no lo llenó a mano.
+   *
+   * Apagado, el hueco enseña exactamente lo curado y nada más — y si no hay
+   * nada curado, el bloque no se pinta. Es la única forma de dejar un pedazo de
+   * la portada limpio a propósito: antes de esto, un hueco vacío siempre
+   * terminaba con una nota que nadie eligió. Ver 0015_portada_vacia.sql.
+   */
+  autofill_lead: boolean;
+  autofill_breaking: boolean;
+  autofill_featured: boolean;
+  autofill_opinion: boolean;
   /**
    * Las cuentas de la redacción, que salen con su logotipo en el masthead y en
    * el pie. Mismos nombres de columna que en `admins`, para que las lea el
@@ -113,7 +131,7 @@ export const getSiteSettings = cache(async (): Promise<SiteSettings> => {
   const { data } = await supabasePublic()
     .from("site_settings")
     .select(
-      "hero_headline_html, hero_headline_json, newsletter_title, newsletter_label, footer_tagline, punctuation_accent, inline_recos_count, inline_recos_source, inline_recos_label, x_url, facebook_url, instagram_url, tiktok_url, youtube_url, linkedin_url",
+      "hero_headline_html, hero_headline_json, newsletter_title, newsletter_label, footer_tagline, punctuation_accent, inline_recos_count, inline_recos_source, inline_recos_label, autofill_lead, autofill_breaking, autofill_featured, autofill_opinion, x_url, facebook_url, instagram_url, tiktok_url, youtube_url, linkedin_url",
     )
     .maybeSingle();
 
@@ -128,6 +146,10 @@ export const getSiteSettings = cache(async (): Promise<SiteSettings> => {
       inline_recos_count: 2,
       inline_recos_source: "latest",
       inline_recos_label: "Te recomendamos",
+      autofill_lead: true,
+      autofill_breaking: true,
+      autofill_featured: true,
+      autofill_opinion: true,
       x_url: null,
       facebook_url: null,
       instagram_url: null,
@@ -182,6 +204,14 @@ export async function getHomeData(): Promise<HomeData> {
     return out;
   };
 
+  /** El apagador del relleno de cada hueco; ver `SiteSettings.autofill_lead`. */
+  const autofill: Record<HomeSlot, boolean> = {
+    lead: settings.autofill_lead,
+    breaking: settings.autofill_breaking,
+    featured: settings.autofill_featured,
+    opinion: settings.autofill_opinion,
+  };
+
   /**
    * Curado primero; lo que falte se completa con lo más reciente sin usar.
    *
@@ -197,6 +227,13 @@ export async function getHomeData(): Promise<HomeData> {
     const picked = curatedFor(slot).slice(0, size);
     picked.forEach((n) => used.add(n.id));
     const isCurated = picked.length > 0;
+
+    // Relleno apagado: el hueco enseña exactamente lo que se eligió a mano, que
+    // pueden ser cero notas. Es lo que deja la fila de Opinión con una sola
+    // columna, o el bloque entero en blanco, en vez de completarlo con lo que
+    // toque.
+    if (!autofill[slot]) return [picked, isCurated];
+
     return [[...picked, ...take(size - picked.length)], isCurated];
   }
 
@@ -206,17 +243,10 @@ export async function getHomeData(): Promise<HomeData> {
   const [opinion, opinionCurated] = fill("opinion", OPINION_SIZE);
   const grid = take(GRID_SIZE);
 
-  // Va al final y no dentro del `Promise.all` de arriba porque necesita saber
-  // qué se pintó arriba. Solo se descartan el lead y la rejilla: son los dos
-  // bloques grandes, los que el lector no puede no haber visto. Las del sidebar
-  // sí se repiten aquí a propósito — es una lista lateral y chica, y excluirla
-  // vaciaba los renglones justo cuando el sitio tiene pocas notas, que es
-  // cuando más falta hace llenar la portada.
-  const aboveIds = new Set([...leadList, ...grid].map((news) => news.id));
   const lead = leadList[0] ?? null;
 
   const [categoryRows, leadImages] = await Promise.all([
-    categoryRowsFor(supabase, categories, aboveIds),
+    categoryRowsFor(supabase, categories),
     lead ? galleryFor(supabase, lead.id) : Promise.resolve([]),
   ]);
 
@@ -260,13 +290,19 @@ async function galleryFor(
 }
 
 /**
- * Las últimas notas de cada sección, saltándose las que ya salieron arriba.
+ * Las últimas notas de cada sección: las tres más recientes, tal cual.
  *
  * Una consulta por sección en vez de agrupar el pool: el pool son las 40 más
  * recientes del sitio y una sección que publica poco no aparecería ahí, así que
  * agrupar dejaría renglones vacíos justo en las secciones que más necesitan que
- * se les vea. Se piden `exclude.size` de más para que descartar las repetidas
- * no deje el renglón corto.
+ * se les vea.
+ *
+ * El renglón NO descarta lo que ya salió arriba. Antes sí lo hacía —se quitaban
+ * el lead y las cuatro de la rejilla— y el resultado era que en un sitio con
+ * pocas notas cada sección se quedaba con una o dos, con la fila de tres
+ * columnas medio vacía. El renglón se lee como "lo último de esta sección", y
+ * eso son sus tres últimas aunque una ya haya pasado por la rejilla: es una
+ * miniatura de 56px a media página de distancia, no una repetición que estorbe.
  *
  * La sección se resuelve por la tabla puente: una nota etiquetada en Política y
  * en Nacionales sale en los dos renglones, que es justo para lo que se etiquetó
@@ -275,7 +311,6 @@ async function galleryFor(
 async function categoryRowsFor(
   supabase: ReturnType<typeof supabasePublic>,
   categories: Category[],
-  exclude: Set<string>,
 ): Promise<CategoryRow[]> {
   const rows = await Promise.all(
     categories.map(async (category) => {
@@ -285,17 +320,15 @@ async function categoryRowsFor(
         .eq("status", "published")
         .eq("news_categories.category_id", category.id)
         .order("published_at", { ascending: false, nullsFirst: false })
-        .limit(CATEGORY_ROW_SIZE + exclude.size);
+        .limit(CATEGORY_ROW_SIZE);
 
-      const items = stripSectionJoin((data ?? []) as unknown[])
-        .filter((news) => !exclude.has(news.id))
-        .slice(0, CATEGORY_ROW_SIZE);
+      const items = stripSectionJoin((data ?? []) as unknown[]).slice(0, CATEGORY_ROW_SIZE);
 
       return { category, items };
     }),
   );
 
-  // Una sección recién creada, o cuya única nota ya salió arriba, no pinta un
+  // Una sección recién creada, o sin nada publicado todavía, no pinta un
   // renglón vacío: desaparece hasta que tenga algo que mostrar.
   return rows.filter((row) => row.items.length > 0);
 }

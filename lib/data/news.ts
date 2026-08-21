@@ -3,12 +3,18 @@ import type { RecoSource } from "@/lib/data/home";
 import { MAX_RECOMMENDATIONS } from "@/lib/news-input";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabasePublic } from "@/lib/supabase/public";
-import { dayBoundaryInstant, NO_CATEGORY, type DateField } from "@/lib/news-filters";
+import {
+  dayBoundaryInstant,
+  NEWS_OPTIONS_LIMIT,
+  NO_CATEGORY,
+  type DateField,
+} from "@/lib/news-filters";
 import { readMinutes, uniqueSlug } from "@/lib/slug";
 import type {
   News,
   NewsImage,
   NewsImageInput,
+  NewsOption,
   NewsStatus,
   NewsWithCategory,
   NewsWithImages,
@@ -360,6 +366,87 @@ export async function countAllForAdmin(authorId?: string): Promise<number> {
 
   if (error) throw new Error(error.message);
   return count ?? 0;
+}
+
+// ---------------------------------------------------------------------------
+// Buscador de notas del panel
+//
+// Los selectores de portada y de "recomendadas dentro del texto" pintaban el
+// catálogo entero en un <select>. Con la redacción trabajando eso deja de ser
+// una lista y pasa a ser un archivo: encontrar la nota de ayer entre miles
+// obliga a leer renglón por renglón, y además todo ese HTML viaja en cada carga
+// del panel. Aquí solo salen las más recientes, y quien busque algo viejo
+// escribe y el servidor lo encuentra.
+// ---------------------------------------------------------------------------
+
+/**
+ * Lo mínimo para pintar un resultado. Sin `excerpt` ni portada: en una lista de
+ * títulos no se ven, y son las dos columnas más pesadas del listado.
+ */
+const OPTION_COLUMNS =
+  "id, title, status, published_at, updated_at, category:categories!news_category_id_fkey(id, name, slug)";
+
+export interface NewsOptionFilters {
+  /** Texto libre; se busca en título y extracto, como en el listado. */
+  q?: string;
+  /** Id de categoría, o `NO_CATEGORY` para las notas sin sección. */
+  categoryId?: string;
+  status?: NewsStatus;
+  /** La nota que se está editando: no se recomienda a sí misma. */
+  excludeId?: string;
+  limit?: number;
+}
+
+/** Las más recientes que casan con el filtro, ya recortadas. */
+export async function listNewsOptions(
+  filters: NewsOptionFilters = {},
+): Promise<NewsOption[]> {
+  const bySection = Boolean(filters.categoryId) && filters.categoryId !== NO_CATEGORY;
+
+  let query = supabaseAdmin()
+    .from("news")
+    .select(`${OPTION_COLUMNS}${bySection ? `, ${SECTION_JOIN}` : ""}`)
+    .order("updated_at", { ascending: false })
+    .limit(filters.limit ?? NEWS_OPTIONS_LIMIT);
+
+  const term = filters.q?.trim();
+  if (term) {
+    query = query.or(`title.ilike.${likeValue(term)},excerpt.ilike.${likeValue(term)}`);
+  }
+
+  if (filters.status) query = query.eq("status", filters.status);
+  if (filters.excludeId) query = query.neq("id", filters.excludeId);
+
+  if (filters.categoryId === NO_CATEGORY) query = query.is("category_id", null);
+  else if (filters.categoryId) {
+    query = query.eq("news_categories.category_id", filters.categoryId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return stripSectionJoin(data ?? []) as unknown as NewsOption[];
+}
+
+/**
+ * Las notas ya elegidas, por id. Es lo que deja que la portada abra mostrando
+ * el título de lo que tiene puesto sin cargar el catálogo: lo guardado son ids,
+ * y un id no se puede leer.
+ *
+ * Devuelve solo las que existan y sigan publicadas — de una despublicada no hay
+ * nada que pintar, y el selector la marca como no disponible.
+ */
+export async function listNewsOptionsByIds(ids: string[]): Promise<NewsOption[]> {
+  const wanted = [...new Set(ids.filter(Boolean))];
+  if (wanted.length === 0) return [];
+
+  const { data, error } = await supabaseAdmin()
+    .from("news")
+    .select(OPTION_COLUMNS)
+    .in("id", wanted)
+    .eq("status", "published");
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as NewsOption[];
 }
 
 /**

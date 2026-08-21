@@ -20,6 +20,11 @@ function clampCount(value: unknown, fallback: number): number {
   return Math.min(Math.max(Math.trunc(n), 0), MAX_RECOMMENDATIONS);
 }
 
+/** Booleano tal cual, o lo que ya estaba guardado si no vino uno. */
+function flag(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
 export async function GET() {
   const admin = await requirePermission("portada");
   if (admin instanceof Response) return admin;
@@ -107,6 +112,12 @@ export async function PUT(request: Request) {
             ? s.inline_recos_source
             : current.inline_recos_source,
         inline_recos_label: text(s.inline_recos_label, current.inline_recos_label),
+        // El apagador del relleno de cada hueco. `flag()` y no `?? current`
+        // porque un `false` es un valor legítimo aquí: es justo el que apaga.
+        autofill_lead: flag(s.autofill_lead, current.autofill_lead),
+        autofill_breaking: flag(s.autofill_breaking, current.autofill_breaking),
+        autofill_featured: flag(s.autofill_featured, current.autofill_featured),
+        autofill_opinion: flag(s.autofill_opinion, current.autofill_opinion),
       })
       .eq("id", true);
 

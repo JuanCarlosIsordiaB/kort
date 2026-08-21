@@ -112,6 +112,23 @@ export interface NewsWithCategory extends News {
   category: Pick<Category, "id" | "name" | "slug"> | null;
 }
 
+/**
+ * Lo mínimo para pintar una nota en el buscador del panel: el renglón de una
+ * lista de resultados, no la nota entera.
+ *
+ * Existe porque los selectores de portada y de recomendadas dejaron de recibir
+ * el catálogo completo. Mandar `NewsWithCategory` ahí arrastraría el extracto y
+ * la portada de cada resultado por nada.
+ */
+export interface NewsOption {
+  id: string;
+  title: string;
+  status: NewsStatus;
+  published_at: string | null;
+  updated_at: string;
+  category: Pick<Category, "id" | "name" | "slug"> | null;
+}
+
 /** Noticia con su galería, para el detalle. */
 export interface NewsWithImages extends NewsWithCategory {
   images: NewsImage[];
