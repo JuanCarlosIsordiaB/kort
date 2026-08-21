@@ -141,8 +141,10 @@ export default async function ReporteroPage(props: PageProps<"/reportero/[slug]"
 
       <main className="w-full flex-1 px-6 py-10 md:px-10">
         {/* Mismo banner con fondo que /categoria: es la misma idea —de quién es
-            todo lo que viene abajo— y conviene que se lea igual. */}
-        <div className="mb-10 flex flex-wrap items-center gap-5 bg-chip px-8 py-10">
+            todo lo que viene abajo— y conviene que se lea igual. En columna
+            hasta `sm` por lo mismo que en ColumnistHeader: el nombre no cabe al
+            lado de un retrato en la pantalla de un teléfono. */}
+        <div className="mb-10 flex flex-col items-start gap-5 bg-chip px-6 py-8 sm:flex-row sm:items-center sm:px-8 sm:py-10">
           {reporter.avatar_url ? (
             <Image
               src={reporter.avatar_url}
@@ -160,8 +162,10 @@ export default async function ReporteroPage(props: PageProps<"/reportero/[slug]"
             </span>
           )}
 
-          <div className="min-w-0">
-            <h1 className="text-4xl font-extrabold">{punct(reporter.display_name)}</h1>
+          <div className="w-full min-w-0">
+            <h1 className="text-3xl font-extrabold sm:text-4xl">
+              {punct(reporter.display_name)}
+            </h1>
             <p className="mt-2 text-sm font-semibold text-muted">
               {total === 0
                 ? "Todavía sin notas publicadas"

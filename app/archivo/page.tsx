@@ -5,7 +5,6 @@ import { NewsCard } from "@/components/news/NewsCard";
 import { Pagination } from "@/components/news/Pagination";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader } from "@/components/site/SiteHeader";
-import { getSiteSettings } from "@/lib/data/home";
 import { listPublished } from "@/lib/data/news";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
 
@@ -36,10 +35,7 @@ export default async function ArchivoPage(props: PageProps<"/archivo">) {
   const { page: pageParam } = await props.searchParams;
   const page = Number(Array.isArray(pageParam) ? pageParam[0] : pageParam) || 1;
 
-  const [{ items, page: currentPage, pageCount, total }, settings] = await Promise.all([
-    listPublished({ page }),
-    getSiteSettings(),
-  ]);
+  const { items, page: currentPage, pageCount, total } = await listPublished({ page });
 
   return (
     <>
@@ -70,7 +66,7 @@ export default async function ArchivoPage(props: PageProps<"/archivo">) {
         <Pagination page={currentPage} pageCount={pageCount} basePath="/archivo" />
       </main>
 
-      <SiteFooter tagline={settings.footer_tagline} />
+      <SiteFooter />
     </>
   );
 }

@@ -1,5 +1,7 @@
+import { cache } from "react";
+
 import { listCategories } from "@/lib/data/categories";
-import { PUBLIC_COLUMNS } from "@/lib/data/news";
+import { PUBLIC_COLUMNS, SECTION_JOIN, stripSectionJoin } from "@/lib/data/news";
 import { supabasePublic } from "@/lib/supabase/public";
 import type { Category, NewsImage, NewsWithCategory } from "@/lib/types";
 
@@ -35,6 +37,17 @@ export interface SiteSettings {
   inline_recos_count: number;
   inline_recos_source: RecoSource;
   inline_recos_label: string;
+  /**
+   * Las cuentas de la redacción, que salen con su logotipo en el masthead y en
+   * el pie. Mismos nombres de columna que en `admins`, para que las lea el
+   * mismo `socialList()` del catálogo; ver 0013_redes_del_sitio.sql.
+   */
+  x_url: string | null;
+  facebook_url: string | null;
+  instagram_url: string | null;
+  tiktok_url: string | null;
+  youtube_url: string | null;
+  linkedin_url: string | null;
 }
 
 /**
@@ -83,11 +96,24 @@ const GRID_SIZE = 4;
  */
 const CATEGORY_ROW_SIZE = 3;
 
-export async function getSiteSettings(): Promise<SiteSettings> {
+/**
+ * La fila única de ajustes.
+ *
+ * Con `cache()` porque en una misma página la piden varios: el layout raíz (la
+ * puntuación en naranja), la portada, y ahora el masthead y el pie, que leen de
+ * aquí las redes de la redacción para no obligar a las siete páginas públicas a
+ * pasárselas por props —y a que alguien se acuerde de hacerlo al crear la
+ * octava—. Es una sola fila y una sola consulta por render.
+ *
+ * La lista del `select` es un literal y no un `join`: supabase-js la lee en
+ * tiempo de compilación para tipar las filas, y cualquier expresión la ensancha
+ * a `string`, con lo que la consulta deja de estar tipada.
+ */
+export const getSiteSettings = cache(async (): Promise<SiteSettings> => {
   const { data } = await supabasePublic()
     .from("site_settings")
     .select(
-      "hero_headline_html, hero_headline_json, newsletter_title, newsletter_label, footer_tagline, punctuation_accent, inline_recos_count, inline_recos_source, inline_recos_label",
+      "hero_headline_html, hero_headline_json, newsletter_title, newsletter_label, footer_tagline, punctuation_accent, inline_recos_count, inline_recos_source, inline_recos_label, x_url, facebook_url, instagram_url, tiktok_url, youtube_url, linkedin_url",
     )
     .maybeSingle();
 
@@ -102,9 +128,15 @@ export async function getSiteSettings(): Promise<SiteSettings> {
       inline_recos_count: 2,
       inline_recos_source: "latest",
       inline_recos_label: "Te recomendamos",
+      x_url: null,
+      facebook_url: null,
+      instagram_url: null,
+      tiktok_url: null,
+      youtube_url: null,
+      linkedin_url: null,
     }
   );
-}
+});
 
 export async function getHomeData(): Promise<HomeData> {
   const supabase = supabasePublic();
@@ -136,7 +168,8 @@ export async function getHomeData(): Promise<HomeData> {
   }
 
   // `used` evita que la misma nota salga en dos bloques cuando el relleno
-  // automático entra en acción.
+  // automático entra en acción. Manda solo sobre el relleno: lo que el panel
+  // puso a mano se pinta aunque ya esté arriba.
   const used = new Set<string>();
   const take = (n: number, from: NewsWithCategory[] = pool) => {
     const out: NewsWithCategory[] = [];
@@ -149,9 +182,19 @@ export async function getHomeData(): Promise<HomeData> {
     return out;
   };
 
-  /** Curado primero; lo que falte se completa con lo más reciente sin usar. */
+  /**
+   * Curado primero; lo que falte se completa con lo más reciente sin usar.
+   *
+   * Lo curado no pasa por `used`: un hueco no puede quitarle su nota a otro.
+   * "Último minuto" y "Destacadas" son dos pestañas del mismo sidebar, no dos
+   * listas rivales, y la nota del día suele ser las dos cosas a la vez.
+   * Descartarla de una por salir en la otra era lo contrario de lo que se pidió
+   * al ponerla ahí, y encima silencioso: la pestaña curada perdía su pick y lo
+   * reemplazaba con relleno. El relleno automático sí sigue esquivando todo lo
+   * ya pintado, para no repetir lo que nadie pidió repetir.
+   */
   function fill(slot: HomeSlot, size: number): [NewsWithCategory[], boolean] {
-    const picked = curatedFor(slot).filter((n) => !used.has(n.id)).slice(0, size);
+    const picked = curatedFor(slot).slice(0, size);
     picked.forEach((n) => used.add(n.id));
     const isCurated = picked.length > 0;
     return [[...picked, ...take(size - picked.length)], isCurated];
@@ -224,6 +267,10 @@ async function galleryFor(
  * agrupar dejaría renglones vacíos justo en las secciones que más necesitan que
  * se les vea. Se piden `exclude.size` de más para que descartar las repetidas
  * no deje el renglón corto.
+ *
+ * La sección se resuelve por la tabla puente: una nota etiquetada en Política y
+ * en Nacionales sale en los dos renglones, que es justo para lo que se etiquetó
+ * en las dos. Ver 0014_secciones_extra.sql.
  */
 async function categoryRowsFor(
   supabase: ReturnType<typeof supabasePublic>,
@@ -234,13 +281,13 @@ async function categoryRowsFor(
     categories.map(async (category) => {
       const { data } = await supabase
         .from("news")
-        .select(COLUMNS)
+        .select(`${COLUMNS}, ${SECTION_JOIN}`)
         .eq("status", "published")
-        .eq("category_id", category.id)
+        .eq("news_categories.category_id", category.id)
         .order("published_at", { ascending: false, nullsFirst: false })
         .limit(CATEGORY_ROW_SIZE + exclude.size);
 
-      const items = ((data ?? []) as unknown as NewsWithCategory[])
+      const items = stripSectionJoin((data ?? []) as unknown[])
         .filter((news) => !exclude.has(news.id))
         .slice(0, CATEGORY_ROW_SIZE);
 

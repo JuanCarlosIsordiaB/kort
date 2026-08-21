@@ -31,6 +31,18 @@ export const SOCIAL_IDS = [
 export type SocialId = (typeof SOCIAL_IDS)[number];
 
 /**
+ * Las que tienen sentido para el periódico mismo.
+ *
+ * Es el catálogo menos "web": el sitio web de Kort es Kort, y ese campo en el
+ * formulario de ajustes sólo invitaría a poner un enlace que apunta a la misma
+ * página en la que está el lector. Las cuentas de la redacción viven en
+ * `site_settings` (0013_redes_del_sitio.sql), las de cada firma en `admins`.
+ */
+export const SITE_SOCIAL_IDS: readonly SocialId[] = SOCIAL_IDS.filter(
+  (id) => id !== "web",
+);
+
+/**
  * Las columnas de `admins` donde viven. Es un tipo y no `string` para que
  * cualquier fila que ya traiga estos campos —`PublicReporter`, el admin de la
  * sesión— se pueda pasar a `socialList` sin convertirla ni ensancharla.
@@ -204,21 +216,29 @@ export function normalizeSocial(
 }
 
 /**
- * Valida las siete columnas del cuerpo que manda el formulario.
+ * Valida las columnas de redes del cuerpo que manda el formulario.
  *
- * Devuelve siempre las siete, con `null` en las vacías, para que el `update`
- * pueda pasarlas tal cual: un campo que se borró tiene que llegar como `null` a
- * la base, y omitirlo lo dejaría con el valor viejo.
+ * Devuelve siempre una entrada por cada red de `ids`, con `null` en las vacías,
+ * para que el `update` pueda pasarlas tal cual: un campo que se borró tiene que
+ * llegar como `null` a la base, y omitirlo lo dejaría con el valor viejo.
+ *
+ * `ids` acota el catálogo a las columnas que existen en la tabla destino:
+ * `admins` tiene las siete y `site_settings` sólo las seis de
+ * `SITE_SOCIAL_IDS`. El tipo de retorno es parcial porque el subconjunto lo
+ * elige quien llama; dentro del subconjunto la garantía de arriba se mantiene.
  */
-export function parseSocials(body: unknown): SocialFields | { error: string } {
+export function parseSocials(
+  body: unknown,
+  ids: readonly SocialId[] = SOCIAL_IDS,
+): Partial<SocialFields> | { error: string } {
   if (typeof body !== "object" || body === null) {
     return { error: "Las redes sociales llegaron en un formato inesperado" };
   }
 
   const input = body as Record<string, unknown>;
-  const fields = {} as SocialFields;
+  const fields: Partial<SocialFields> = {};
 
-  for (const id of SOCIAL_IDS) {
+  for (const id of ids) {
     const { column, label } = SOCIAL_NETWORKS[id];
     const raw = input[column];
 
@@ -249,9 +269,15 @@ export function parseSocials(body: unknown): SocialFields | { error: string } {
  * y una fila editada a mano en el SQL editor de Supabase nunca pasó por
  * `normalizeSocial`. La comprobación del lado que renderiza es la que cuenta.
  */
+export interface SocialLink {
+  id: SocialId;
+  label: string;
+  url: string;
+}
+
 export function socialList(
   source: Partial<SocialFields> | null | undefined,
-): { id: SocialId; label: string; url: string }[] {
+): SocialLink[] {
   if (!source) return [];
 
   return SOCIAL_IDS.flatMap((id) => {

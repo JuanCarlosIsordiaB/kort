@@ -5,7 +5,10 @@ import { useEffect, useRef, useState } from "react";
 
 import { categoryPath } from "@/lib/category-path";
 import { upper } from "@/lib/format";
+import type { SocialLink } from "@/lib/social";
 import type { Category } from "@/lib/types";
+
+import { SiteSocials } from "./SiteSocials";
 
 /**
  * Las secciones del masthead en móvil.
@@ -18,7 +21,13 @@ import type { Category } from "@/lib/types";
  * remonta el componente, y con Escape / click fuera para que no se quede
  * tapando la portada.
  */
-export function MobileNav({ categories }: { categories: Category[] }) {
+export function MobileNav({
+  categories,
+  socials,
+}: {
+  categories: Category[];
+  socials: SocialLink[];
+}) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -90,13 +99,19 @@ export function MobileNav({ categories }: { categories: Category[] }) {
             ))}
           </nav>
 
-          <Link
-            href="/#boletin"
-            onClick={() => setOpen(false)}
-            className="mt-4 inline-block rounded-[var(--radius-pill)] border border-foreground bg-foreground px-5 py-2.5 text-xs font-extrabold tracking-[1.2px] text-background"
-          >
-            SUSCRIBIRSE
-          </Link>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <Link
+              href="/#boletin"
+              onClick={() => setOpen(false)}
+              className="inline-block rounded-[var(--radius-pill)] border border-foreground bg-foreground px-5 py-2.5 text-xs font-extrabold tracking-[1.2px] text-background"
+            >
+              SUSCRIBIRSE
+            </Link>
+
+            {/* En móvil las redes viven aquí y no en el masthead: ahí competirían
+                con el logo y el botón de tema en 375px de ancho. */}
+            <SiteSocials links={socials} size={20} className="flex" />
+          </div>
         </div>
       )}
     </div>

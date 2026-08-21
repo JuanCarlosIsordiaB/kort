@@ -19,6 +19,9 @@ export function parseNewsInput(body: unknown): NewsInput | { error: string } {
 
   const status = b.status === "published" ? "published" : "draft";
 
+  const categoryId =
+    typeof b.category_id === "string" && b.category_id ? b.category_id : null;
+
   if (status === "published" && !b.content_html) {
     return { error: "No se puede publicar una noticia sin contenido" };
   }
@@ -32,7 +35,8 @@ export function parseNewsInput(body: unknown): NewsInput | { error: string } {
     excerpt: typeof b.excerpt === "string" && b.excerpt.trim() ? b.excerpt.trim() : null,
     content: b.content ?? null,
     content_html: typeof b.content_html === "string" ? b.content_html : null,
-    category_id: typeof b.category_id === "string" && b.category_id ? b.category_id : null,
+    category_id: categoryId,
+    extra_category_ids: parseExtraCategories(b.extra_category_ids, categoryId),
     images: images.images,
     recommendations: parseRecommendations(b.recommendations),
   };
@@ -56,6 +60,24 @@ function parseRecommendations(value: unknown): string[] {
     .slice(0, MAX_RECOMMENDATIONS);
 }
 
+/**
+ * Las secciones en las que se lista la nota además de la principal.
+ *
+ * Solo se limpia la forma —cadenas, sin repetidos, sin la principal—: que la
+ * sección exista no se valida aquí porque la llave foránea de la tabla puente
+ * ya lo hace, y un id inventado a mano merece el error crudo que da, no un
+ * mensaje de formulario que nadie va a leer.
+ */
+function parseExtraCategories(value: unknown, primary: string | null): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter((id): id is string => typeof id === "string" && id.length > 0)
+    .filter((id) => id !== primary)
+    .filter((id, i, all) => all.indexOf(id) === i)
+    .slice(0, MAX_EXTRA_CATEGORIES);
+}
+
 const MAX_IMAGES = 12;
 
 /**
@@ -66,6 +88,17 @@ const MAX_IMAGES = 12;
  * `server-only`: importarlo desde un Client Component revienta el build.
  */
 export const MAX_RECOMMENDATIONS = 2;
+
+/**
+ * Cuántas secciones extra admite una nota. Vive aquí por lo mismo que
+ * `MAX_RECOMMENDATIONS`: el formulario del panel también lo necesita.
+ *
+ * Hay tope porque el cuerpo lo manda el navegador y sin él un arreglo de mil
+ * ids serían mil inserciones. Cuatro sobra para lo que significa la función —una
+ * nota que es de dos o tres cosas a la vez—: una nota en todas las secciones no
+ * estaría en ninguna.
+ */
+export const MAX_EXTRA_CATEGORIES = 4;
 
 function parseImages(value: unknown): { images: NewsImageInput[] } | { error: string } {
   if (value === undefined || value === null) return { images: [] };

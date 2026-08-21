@@ -374,10 +374,12 @@ function Field({
   label,
   value,
   onChange,
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  placeholder?: string;
 }) {
   return (
     <label className="flex flex-col gap-1">
@@ -385,6 +387,9 @@ function Field({
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        // `type="text"` y no `type="url"`: el navegador rechazaría "@kortmx",
+        // que es una de las dos formas que acepta el validador.
         className="rounded-[var(--radius-thumb)] border border-border bg-input px-3 py-2 text-sm"
       />
     </label>

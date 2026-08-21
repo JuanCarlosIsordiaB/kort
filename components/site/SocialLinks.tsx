@@ -1,5 +1,7 @@
 import { socialList, type SocialFields } from "@/lib/social";
 
+import { SocialIcon } from "./SocialIcon";
+
 /**
  * Las redes de quien firma, bajo su nombre.
  *
@@ -9,14 +11,15 @@ import { socialList, type SocialFields } from "@/lib/social";
  * a comprobar que cada URL sea http/https antes de que aquí se convierta en un
  * `href`.
  *
- * Píldoras de texto y no iconos: el sitio no tiene librería de iconos ni un
- * solo SVG de marca, y meter siete logotipos por esto sería estrenar una
- * dependencia visual entera. El nombre escrito además se lee igual en un lector
- * de pantalla, sin `aria-label` que mantener.
+ * Logotipo y nombre, no sólo el logotipo. En el pie del sitio seis iconos
+ * sueltos se leen como una fila de botones conocida, pero aquí van bajo el
+ * nombre de una persona y en número variable: el rótulo escrito dice de quién
+ * es la cuenta sin obligar a reconocer la marca, y de paso es el nombre
+ * accesible del enlace, sin `aria-label` que mantener aparte.
  */
 
 const LINK_CLASS =
-  "rounded-[var(--radius-pill)] border border-border-strong px-4 py-2 text-[11px] font-extrabold tracking-[1.2px] transition-colors hover:border-foreground hover:bg-foreground hover:text-background";
+  "inline-flex items-center gap-2 rounded-[var(--radius-pill)] border border-border-strong px-4 py-2 text-[11px] font-extrabold tracking-[1.2px] transition-colors hover:border-foreground hover:bg-foreground hover:text-background";
 
 export function SocialLinks({
   source,
@@ -50,6 +53,7 @@ export function SocialLinks({
             rel="me noopener noreferrer"
             className={LINK_CLASS}
           >
+            <SocialIcon id={link.id} size={14} />
             {link.label}
           </a>
         </li>

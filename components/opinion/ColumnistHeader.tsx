@@ -21,17 +21,30 @@ export function ColumnistHeader({
   total: number;
 }) {
   return (
-    <header className="mb-10 flex flex-wrap items-start gap-6 bg-chip px-8 py-10">
+    /*
+      En columna hasta `sm`, en fila de ahí para arriba. El `flex-wrap` no
+      bastaba: la columna de texto lleva `min-w-0`, así que su ancho mínimo es
+      cero y nunca desbordaba lo suficiente para saltar de renglón. En un
+      teléfono de 375px quedaban 111px para el nombre y la semblanza al lado de
+      un retrato de 128px —una tira de dos y tres palabras por línea que se leía
+      como dos columnas rotas—. También se recorta el padding: 32px por lado en
+      una pantalla que ya trae 24px de la página era casi un tercio del ancho.
+    */
+    <header className="mb-10 flex flex-col items-start gap-6 bg-chip px-6 py-8 sm:flex-row sm:px-8 sm:py-10">
       <ColumnistAvatar src={columnist.avatar_url} name={columnist.display_name} size={128} />
 
-      <div className="min-w-0 flex-1">
+      {/* `w-full` porque `items-start` alinea al inicio también en columna, y
+          sin él la caja se encogería a su contenido en vez de ocupar el ancho. */}
+      <div className="w-full min-w-0 sm:flex-1">
         {columnist.column_name && (
           <div className="mb-2 text-[11px] font-extrabold tracking-[2px] text-accent">
             {upper(columnist.column_name)}
           </div>
         )}
 
-        <h1 className="text-4xl font-extrabold">{punct(columnist.display_name)}</h1>
+        <h1 className="text-3xl font-extrabold sm:text-4xl">
+          {punct(columnist.display_name)}
+        </h1>
 
         {columnist.tagline && (
           <p className="mt-2 text-sm font-semibold text-muted">{punct(columnist.tagline)}</p>

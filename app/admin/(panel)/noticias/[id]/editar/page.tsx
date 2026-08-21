@@ -7,6 +7,7 @@ import { canEditNews } from "@/lib/auth/news-access";
 import { getCurrentAdmin } from "@/lib/auth/session";
 import { listCategories } from "@/lib/data/categories";
 import {
+  getCategoryIdsFor,
   getImagesFor,
   getNewsById,
   getRecommendationIdsFor,
@@ -23,10 +24,11 @@ export default async function EditarNoticiaPage(
   const admin = await getCurrentAdmin();
   if (!admin) redirect(LOGIN_PATH);
 
-  const [news, categories, images, recommendations, all] = await Promise.all([
+  const [news, categories, images, sections, recommendations, all] = await Promise.all([
     getNewsById(id),
     listCategories(),
     getImagesFor(id),
+    getCategoryIdsFor(id),
     getRecommendationIdsFor(id),
     listAllForAdmin(),
   ]);
@@ -45,6 +47,7 @@ export default async function EditarNoticiaPage(
         categories={categories}
         news={news}
         images={images}
+        sections={sections}
         recommendable={all.filter((n) => n.status === "published")}
         recommendations={recommendations}
       />

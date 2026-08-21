@@ -21,9 +21,46 @@ export const PAGE_SIZE = 12;
 /**
  * Columnas que se mandan al público. Nunca se hace `select("*")` aquí: el
  * listado público no tiene por qué cargar el JSON de Tiptap ni el `status`.
+ *
+ * El `!news_category_id_fkey` del embebido nombra por cuál de los dos caminos
+ * se llega a `categories`. Desde que existe la tabla puente hay dos —la llave
+ * de `news.category_id` y el muchos-a-muchos que pasa por
+ * `news_categories`— y PostgREST se niega a adivinar: sin el nombre de la
+ * llave contesta "more than one relationship was found" y el listado entero se
+ * cae con un 500. Ver 0014_secciones_extra.sql.
  */
 export const PUBLIC_COLUMNS =
-  "id, title, slug, excerpt, cover_image_url, cover_focus_x, cover_focus_y, author_id, author_name, author_avatar_url, read_minutes, view_count, published_at, category:categories(id, name, slug)";
+  "id, title, slug, excerpt, cover_image_url, cover_focus_x, cover_focus_y, author_id, author_name, author_avatar_url, read_minutes, view_count, published_at, category:categories!news_category_id_fkey(id, name, slug)";
+
+/**
+ * El join que convierte "esta sección" en "todas las notas de esta sección".
+ *
+ * `!inner` es la mitad que importa: sin él PostgREST filtra el recurso embebido
+ * y deja la fila padre en su sitio con el embebido vacío —el listado saldría
+ * completo—; con él, la nota que no esté en la sección no vuelve.
+ *
+ * Se consulta la tabla puente y no `news.category_id` porque desde
+ * 0014_secciones_extra.sql una nota puede estar en varias secciones, y el
+ * listado de una tiene que traer también las que la llevan de extra. La puente
+ * guarda la principal además de las extras, así que este join cubre las dos.
+ */
+export const SECTION_JOIN = "news_categories!inner(category_id)";
+
+/**
+ * Quita el embebido que `SECTION_JOIN` deja colgando de cada fila.
+ *
+ * PostgREST solo hace el join si el recurso va en el `select`, y entonces
+ * devuelve un `news_categories` que nadie lee. Estas notas viajan tal cual a
+ * componentes de cliente, así que el arreglo de más se pagaría en el HTML de
+ * cada tarjeta del listado.
+ */
+export function stripSectionJoin(rows: unknown[]): NewsWithCategory[] {
+  return rows.map((row) => {
+    const copy = { ...(row as Record<string, unknown>) };
+    delete copy.news_categories;
+    return copy as unknown as NewsWithCategory;
+  });
+}
 
 // El detalle sí trae la galería completa; los listados no la necesitan y sería
 // traer decenas de filas de más por página.
@@ -46,6 +83,9 @@ const PUBLIC_DETAIL_COLUMNS = `${PUBLIC_COLUMNS}, content_html, created_at, upda
  * columna de un recurso embebido en PostgREST solo vacía el embed, no descarta
  * la fila padre, salvo que el join sea `!inner`. Resolver el slug a id antes
  * (la página ya lo hace para pintar el banner) evita esa trampa por completo.
+ *
+ * El join solo se pide cuando de verdad se filtra por sección: con `!inner`
+ * puesto siempre, una nota sin sección desaparecería del archivo.
  */
 export async function listPublished(options: {
   page?: number;
@@ -58,13 +98,16 @@ export async function listPublished(options: {
 
   let query = supabasePublic()
     .from("news")
-    .select(PUBLIC_COLUMNS, { count: "exact" })
+    .select(
+      options.categoryId ? `${PUBLIC_COLUMNS}, ${SECTION_JOIN}` : PUBLIC_COLUMNS,
+      { count: "exact" },
+    )
     .eq("status", "published")
     .order("published_at", { ascending: false, nullsFirst: false })
     .range(from, from + PAGE_SIZE - 1);
 
   if (options.categoryId) {
-    query = query.eq("category_id", options.categoryId);
+    query = query.eq("news_categories.category_id", options.categoryId);
   }
 
   if (options.authorId) {
@@ -76,7 +119,7 @@ export async function listPublished(options: {
 
   const total = count ?? 0;
   return {
-    items: (data ?? []) as unknown as NewsWithCategory[],
+    items: stripSectionJoin((data ?? []) as unknown[]),
     total,
     page,
     pageCount: Math.max(1, Math.ceil(total / PAGE_SIZE)),
@@ -207,17 +250,17 @@ export async function getInlineRecommendations(
 
     let query = supabase
       .from("news")
-      .select(PUBLIC_COLUMNS)
+      .select(categoryId ? `${PUBLIC_COLUMNS}, ${SECTION_JOIN}` : PUBLIC_COLUMNS)
       .eq("status", "published")
       .order("published_at", { ascending: false, nullsFirst: false })
       // Margen para descartar la nota misma y lo que ya se eligió a mano.
       .limit(count + seen.size);
 
-    if (categoryId) query = query.eq("category_id", categoryId);
+    if (categoryId) query = query.eq("news_categories.category_id", categoryId);
 
     const { data } = await query;
 
-    for (const news of (data ?? []) as unknown as NewsWithCategory[]) {
+    for (const news of stripSectionJoin((data ?? []) as unknown[])) {
       if (picked.length >= count) break;
       if (seen.has(news.id)) continue;
       seen.add(news.id);
@@ -267,9 +310,15 @@ function likeValue(term: string): string {
 export async function listAllForAdmin(
   filters: AdminNewsFilters = {},
 ): Promise<NewsWithCategory[]> {
+  // "Sin sección" se pregunta por la columna, no por la puente: son justo las
+  // notas que no tienen ningún renglón ahí, y un join nunca las traería.
+  const bySection = Boolean(filters.categoryId) && filters.categoryId !== NO_CATEGORY;
+
   let query = supabaseAdmin()
     .from("news")
-    .select(`${PUBLIC_COLUMNS}, status, created_at, updated_at`)
+    .select(
+      `${PUBLIC_COLUMNS}, status, created_at, updated_at${bySection ? `, ${SECTION_JOIN}` : ""}`,
+    )
     .order("updated_at", { ascending: false });
 
   if (filters.authorId) query = query.eq("author_id", filters.authorId);
@@ -282,7 +331,9 @@ export async function listAllForAdmin(
   if (filters.status) query = query.eq("status", filters.status);
 
   if (filters.categoryId === NO_CATEGORY) query = query.is("category_id", null);
-  else if (filters.categoryId) query = query.eq("category_id", filters.categoryId);
+  else if (filters.categoryId) {
+    query = query.eq("news_categories.category_id", filters.categoryId);
+  }
 
   // Filtrar por `published_at` descarta solo los borradores, que es justo lo que
   // significa preguntar por lo publicado en unas fechas: un NULL nunca cae en un
@@ -293,7 +344,7 @@ export async function listAllForAdmin(
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return (data ?? []) as unknown as NewsWithCategory[];
+  return stripSectionJoin((data ?? []) as unknown[]);
 }
 
 /**
@@ -364,6 +415,11 @@ export interface NewsInput {
   content?: unknown | null;
   content_html?: string | null;
   category_id?: string | null;
+  /**
+   * Las demás secciones en las que se lista la nota, sin la principal. Vacío es
+   * el caso normal: una nota es de una sección salvo que alguien diga otra cosa.
+   */
+  extra_category_ids?: string[];
   status: NewsStatus;
   /** Galería completa. Reemplaza lo que hubiera; el orden del arreglo manda. */
   images?: NewsImageInput[];
@@ -457,6 +513,60 @@ async function replaceRecommendations(
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Reemplaza las secciones de una nota: la principal y las extras.
+ *
+ * Mismo criterio que la galería y las recomendaciones —borrar e insertar— y por
+ * la misma razón: son un puñado de renglones, y así lo guardado es exactamente
+ * lo que mandó el panel, sin filas huérfanas de una sección que se destildó.
+ *
+ * La principal entra en la puente junto con las demás aunque ya viva en
+ * `news.category_id`. Es lo que deja que un listado de sección sea un solo
+ * join; ver 0014_secciones_extra.sql.
+ */
+async function replaceCategories(
+  newsId: string,
+  primaryId: string | null,
+  extraIds: string[] = [],
+): Promise<void> {
+  const supabase = supabaseAdmin();
+
+  const { error: deleteError } = await supabase
+    .from("news_categories")
+    .delete()
+    .eq("news_id", newsId);
+  if (deleteError) throw new Error(deleteError.message);
+
+  const ids = [primaryId, ...extraIds]
+    .filter((id): id is string => Boolean(id))
+    .filter((id, i, all) => all.indexOf(id) === i);
+
+  if (!ids.length) return;
+
+  const { error } = await supabase
+    .from("news_categories")
+    .insert(ids.map((category_id) => ({ news_id: newsId, category_id })));
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Todas las secciones de una nota, la principal incluida, para el formulario.
+ *
+ * Vuelven las de la puente sin descontar la principal a propósito: en el
+ * formulario la principal se puede cambiar sin recargar, así que quién es
+ * "extra" solo se sabe en el momento de pintar. Descontarla aquí obligaría a
+ * volver a leer la nota para algo que el formulario ya tiene en la mano.
+ */
+export async function getCategoryIdsFor(newsId: string): Promise<string[]> {
+  const { data, error } = await supabaseAdmin()
+    .from("news_categories")
+    .select("category_id")
+    .eq("news_id", newsId);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => row.category_id as string);
+}
+
 /** Los picks manuales tal cual están guardados, para el formulario del panel. */
 export async function getRecommendationIdsFor(newsId: string): Promise<string[]> {
   const { data, error } = await supabaseAdmin()
@@ -510,6 +620,7 @@ export async function createNews(
   if (error) throw new Error(error.message);
 
   const news = data as News;
+  await replaceCategories(news.id, news.category_id, input.extra_category_ids);
   await replaceImages(news.id, input.images);
   await replaceRecommendations(news.id, input.recommendations);
   return news;
@@ -553,6 +664,10 @@ export async function updateNews(id: string, input: NewsInput): Promise<News> {
 
   if (error) throw new Error(error.message);
 
+  // Después del UPDATE, no antes: el trigger de la base mete la principal en la
+  // puente al cambiar `category_id`, y este `delete` + `insert` tiene que ser
+  // la última palabra sobre la lista completa.
+  await replaceCategories(id, input.category_id ?? null, input.extra_category_ids);
   await replaceImages(id, input.images);
   await replaceRecommendations(id, input.recommendations);
   return data as News;

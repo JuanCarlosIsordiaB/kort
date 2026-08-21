@@ -16,6 +16,7 @@ const LINKS: { href: string; label: string; permission?: Permission }[] = [
   { href: "/admin", label: "Noticias" },
   { href: "/admin/noticias/nueva", label: "Nueva noticia" },
   { href: "/admin/portada", label: "Portada", permission: "portada" },
+  { href: "/admin/redes", label: "Redes sociales", permission: "redes" },
   { href: "/admin/categorias", label: "Secciones", permission: "secciones" },
   { href: "/admin/publicidad", label: "Publicidad", permission: "publicidad" },
   { href: "/admin/usuarios", label: "Usuarios", permission: "usuarios" },

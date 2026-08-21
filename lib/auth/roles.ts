@@ -37,6 +37,7 @@ export function normalizeRole(value: unknown): AdminRole {
  */
 export type Permission =
   | "portada"
+  | "redes"
   | "secciones"
   | "publicidad"
   | "usuarios"
@@ -46,6 +47,7 @@ export type Permission =
 const PERMISSIONS: Record<AdminRole, readonly Permission[]> = {
   admin: [
     "portada",
+    "redes",
     "secciones",
     "publicidad",
     "usuarios",
@@ -66,6 +68,7 @@ export function can(role: AdminRole, permission: Permission): boolean {
  */
 export const RESTRICTED_PATHS: { prefix: string; permission: Permission }[] = [
   { prefix: "/admin/portada", permission: "portada" },
+  { prefix: "/admin/redes", permission: "redes" },
   { prefix: "/admin/categorias", permission: "secciones" },
   { prefix: "/admin/publicidad", permission: "publicidad" },
   { prefix: "/admin/usuarios", permission: "usuarios" },

@@ -89,11 +89,22 @@ export function isDuplicateOpinionError(message: string): boolean {
   return message.includes("categories_single_opinion_idx");
 }
 
-/** Cuántas noticias apuntan a esta categoría. Decide si se puede borrar. */
+/**
+ * Cuántas noticias apuntan a esta categoría. Decide si se puede borrar.
+ *
+ * Se cuenta la tabla puente y no `news.category_id` porque ahí están las dos
+ * cosas: la puente guarda la sección principal de cada nota además de las
+ * extras (lo sostiene el trigger de 0014_secciones_extra.sql), así que es el
+ * superconjunto. Contar la columna dejaría borrar una sección que sigue siendo
+ * la segunda de veinte notas, y esas notas la perderían en silencio.
+ *
+ * Si el invariante se rompiera alguna vez, el `on delete restrict` de
+ * `news.category_id` sigue siendo el último freno.
+ */
 export async function countNewsInCategory(categoryId: string): Promise<number> {
   const { count, error } = await supabaseAdmin()
-    .from("news")
-    .select("id", { count: "exact", head: true })
+    .from("news_categories")
+    .select("news_id", { count: "exact", head: true })
     .eq("category_id", categoryId);
 
   if (error) throw new Error(error.message);

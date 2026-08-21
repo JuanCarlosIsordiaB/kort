@@ -2,10 +2,13 @@ import Link from "next/link";
 
 import { categoryPath } from "@/lib/category-path";
 import { listCategories } from "@/lib/data/categories";
+import { getSiteSettings } from "@/lib/data/home";
 import { upper } from "@/lib/format";
+import { socialList } from "@/lib/social";
 
 import { KortMark } from "./KortMark";
 import { MobileNav } from "./MobileNav";
+import { SiteSocials } from "./SiteSocials";
 import { ThemeToggle } from "./ThemeToggle";
 
 /**
@@ -20,7 +23,10 @@ import { ThemeToggle } from "./ThemeToggle";
  * bloque de boletín que sí está al pie de la portada.
  */
 export async function SiteHeader({ compact = false }: { compact?: boolean }) {
-  const categories = await listCategories();
+  // `getSiteSettings` está memoizada con `cache()`, así que esto no agrega una
+  // consulta: el pie y el layout raíz ya piden la misma fila en el mismo render.
+  const [categories, settings] = await Promise.all([listCategories(), getSiteSettings()]);
+  const socials = socialList(settings);
 
   return (
     /* `relative` ancla el panel del menú móvil, que cuelga del borde inferior. */
@@ -46,6 +52,10 @@ export async function SiteHeader({ compact = false }: { compact?: boolean }) {
       </div>
 
       <div className="flex shrink-0 items-center gap-3">
+        {/* `md:flex` es exactamente el punto donde MobileNav se esconde: entre
+            los dos, las redes están siempre a la vista una sola vez. */}
+        {!compact && <SiteSocials links={socials} className="hidden md:flex" />}
+
         <ThemeToggle />
 
         {/* En móvil SUSCRIBIRSE vive dentro del menú, junto a las secciones; en
@@ -59,7 +69,7 @@ export async function SiteHeader({ compact = false }: { compact?: boolean }) {
           SUSCRIBIRSE
         </Link>
 
-        {!compact && <MobileNav categories={categories} />}
+        {!compact && <MobileNav categories={categories} socials={socials} />}
       </div>
     </header>
   );

@@ -129,7 +129,7 @@ export default async function HomePage() {
         )}
 
         <NewsletterBand label={settings.newsletter_label} title={settings.newsletter_title} />
-        <SiteFooter tagline={settings.footer_tagline} />
+        <SiteFooter />
       </div>
     </div>
   );
