@@ -36,8 +36,10 @@ jobs:
     # A nivel job: el contexto `env` de un `if` de step no ve las variables
     # declaradas en ese mismo step, y el paso del sitio se salta con un `if`.
     env:
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL || vars.SUPABASE_URL || vars.NEXT_PUBLIC_SUPABASE_URL }}
-      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || vars.SUPABASE_ANON_KEY || vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL || vars.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || vars.SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       SITE_URL: ${{ secrets.SITE_URL }}
 
     steps:
@@ -45,7 +47,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+          resolved_supabase_url="${SUPABASE_URL:-${NEXT_PUBLIC_SUPABASE_URL:-}}"
+          resolved_supabase_anon_key="${SUPABASE_ANON_KEY:-${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}}"
+
+          if [ -z "${resolved_supabase_url}" ] || [ -z "${resolved_supabase_anon_key}" ]; then
             echo "Faltan los secretos SUPABASE_URL o SUPABASE_ANON_KEY." >&2
             exit 1
           fi
@@ -53,8 +58,8 @@ jobs:
           status=$(curl --silent --show-error --location --max-time 30 \
             --retry 3 --retry-delay 10 --retry-all-errors \
             --output /tmp/respuesta.txt --write-out '%{http_code}' \
-            "${SUPABASE_URL}/rest/v1/categories?select=id&limit=1" \
-            --header "apikey: ${SUPABASE_ANON_KEY}" \
+            "${resolved_supabase_url}/rest/v1/categories?select=id&limit=1" \
+            --header "apikey: ${resolved_supabase_anon_key}" \
             --header "Authorization: Bearer ${SUPABASE_ANON_KEY}")
 
           echo "HTTP ${status}"
