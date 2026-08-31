@@ -36,8 +36,8 @@ jobs:
     # A nivel job: el contexto `env` de un `if` de step no ve las variables
     # declaradas en ese mismo step, y el paso del sitio se salta con un `if`.
     env:
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL || vars.SUPABASE_URL || vars.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || vars.SUPABASE_ANON_KEY || vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       SITE_URL: ${{ secrets.SITE_URL }}
 
     steps:
